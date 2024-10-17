@@ -670,7 +670,7 @@ class ProteinVisualization:
         width=600
         )
         
-        fig.update_layout(title=f'Heatmap', xaxis_title="samples", yaxis_title="Proteins")
+        fig.update_layout(title=f'Heatmap', xaxis_title="samples", yaxis_title="Proteins") # type: ignore
 
         return fig  
     
