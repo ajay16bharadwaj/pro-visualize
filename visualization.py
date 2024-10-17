@@ -728,4 +728,65 @@ class ProteinVisualization:
         fig.update_yaxes(scaleanchor="x", scaleratio=1)
 
         return fig
+    
+    def plot_umap(self):
+        import umap
+        """
+        Generates an improved UMAP plot with dynamic color assignment based on sample groups.
+        
+        Parameters:
+        - self: Instance of the ProteinVisualization class.
+        
+        Returns:
+        - fig: Plotly figure object for UMAP projection.
+        """
+        # Ensure that protein data and annotation info are loaded
+        if self.protein_data is None or self.annotation_info is None:
+            raise ValueError("Protein data or annotation information not loaded.")
+
+        # Preprocess protein data for UMAP
+        df = self.preprocess_for_pca()  # You can reuse the PCA preprocessing method for UMAP
+        df = df.T  # Transpose to have samples as rows and proteins as columns
+
+        # Ensure that the dimensions match between annotation and data
+        df = df.loc[self.annotation_info['SampleName']]  # Ensure samples match the annotation info
+        
+        # Perform UMAP on the preprocessed protein data
+        reducer = umap.UMAP(random_state=42, n_neighbors=15, min_dist=0.1)
+        umap_embedding = reducer.fit_transform(df)
+
+        # Add UMAP projection columns to the annotation info DataFrame
+        self.annotation_info['UMAP1'] = umap_embedding[:, 0]
+        self.annotation_info['UMAP2'] = umap_embedding[:, 1]
+
+        # Get unique groups dynamically from the annotation file and create color mapping
+        unique_groups = self.annotation_info['Group'].unique()
+        color_palette = px.colors.qualitative.Plotly  # Dynamic color palette from Plotly
+        color_discrete_map = {group: color_palette[i % len(color_palette)] for i, group in enumerate(unique_groups)}
+
+        # Create UMAP plot using Plotly Express
+        fig = px.scatter(
+            self.annotation_info,
+            x='UMAP1',
+            y='UMAP2',
+            color='Group',
+            hover_data=['SampleName'],
+            title="UMAP Projection",
+            labels={'UMAP1': 'UMAP1', 'UMAP2': 'UMAP2'},
+            color_discrete_map=color_discrete_map
+        )
+
+        # Update layout to improve aesthetics
+        fig.update_traces(marker=dict(size=10))
+        fig.update_layout(
+            height=600,
+            width=800,
+            legend_title_text="Groups",
+            title_x=0.5,
+            title_font=dict(size=20),
+            font=dict(size=12),
+            margin=dict(l=40, r=40, t=60, b=40)
+        )
+
+        return fig
         
