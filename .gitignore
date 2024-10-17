@@ -127,6 +127,10 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+auto_report/
+
+#vscode settings
+.vscode/
 
 # Spyder project settings
 .spyderproject
