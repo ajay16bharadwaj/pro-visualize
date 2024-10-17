@@ -32,7 +32,7 @@ def load_data(path):
 
 
 ## should I move this to compute or helper functions? 
-def dataframe_with_selections(df):
+def dataframe_with_selections(df, custom_key_name):
     df_with_selections = df.copy()
     df_with_selections.insert(0, "Select", False)
 
@@ -42,6 +42,7 @@ def dataframe_with_selections(df):
         hide_index=True,
         column_config={"Select": st.column_config.CheckboxColumn(required=True)},
         disabled=df.columns,
+        key=custom_key_name
     )
 
     # Filter the dataframe using the temporary column, then drop the column
@@ -178,7 +179,7 @@ with tab2:
             custom_row_select = st.checkbox(' Choose custom entries ', key='heatmap_custom_select')
 
             if custom_row_select:
-                selection = dataframe_with_selections(df)
+                selection = dataframe_with_selections(df, "heatmap_custom_df_select")
                 with st.expander("Your selection"):
                     st.write(selection)
 
@@ -226,10 +227,10 @@ with tab3:
         with st.expander("Differentially expressed proteins"):
             st.dataframe(dep_list_df)
 
-        custom_row_select = st.checkbox(' Choose custom entries ')
+        custom_row_select = st.checkbox(' Choose custom entries ', key='violin_custom_select')
 
         if custom_row_select:
-            selection = dataframe_with_selections(df)
+            selection = dataframe_with_selections(df, "violin_custom_df_select")
             with st.expander("Your selection"):
                 st.write(selection)
 
