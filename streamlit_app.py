@@ -136,7 +136,7 @@ with st.container():
  
 
 #initializing tabs
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["Volcano Plot", "Heat Maps", "Violin Plot", "Quantification", "PCA"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["Volcano Plot", "Heat Maps", "Violin Plot", "Quantification", "Clustering"])
 
 #volcano plot - to set interactive FDR and FC thresholds
 with tab1:
@@ -273,38 +273,47 @@ with tab4:
 
 #this tab will be used for PCA 
 with tab5:
-    st.write(' This tab will be used for PCA')
-    # Placeholder for four example plots
 
-    #checks
     if protein_level_status and annotation_status:
+        clust_tab1, clust_tab2 = st.tabs(["PCA", "UMAP"])
+        with clust_tab1: 
+            st.write(' This tab will be used for Clustering')
+            # Placeholder for four example plots
 
-    #PCA computation. 
-        vis.preprocess_for_pca()
-        #st.write(vis.protein_data_for_pca)
-        pca_plot_by_annotation = vis.plot_pca_by_annotation()
-        pca_plot_by_clusters = vis.plot_pca_with_clusters_plotly()
-        hierarchial_clustering_dendogram = vis.plot_vertical_dendrogram()
-        cluster_assignment_table = vis.create_cluster_assignment_table()
+            #checks
+            if protein_level_status and annotation_status:
+
+            #PCA computation. 
+                vis.preprocess_for_pca()
+                #st.write(vis.protein_data_for_pca)
+                pca_plot_by_annotation = vis.plot_pca_by_annotation()
+                pca_plot_by_clusters = vis.plot_pca_with_clusters_plotly()
+                hierarchial_clustering_dendogram = vis.plot_vertical_dendrogram()
+                cluster_assignment_table = vis.create_cluster_assignment_table()
 
 
-    #arranging the page display
-        col1, col2 = st.columns(2) 
+            #arranging the page display
+                col1, col2 = st.columns(2) 
+                        
+                with col1:
+                    st.plotly_chart(pca_plot_by_annotation, use_container_width=True)  # Plot 1 in the first column
+                    st.write("sample")
+                with col2:
+                    st.plotly_chart(pca_plot_by_clusters, use_container_width=True)  # Plot 2 in the second column
+
+                # # Row 2: Another two plots side by side
+                col3, col4 = st.columns(2)
                 
-        with col1:
-            st.plotly_chart(pca_plot_by_annotation, use_container_width=True)  # Plot 1 in the first column
-            st.write("sample")
-        with col2:
-            st.plotly_chart(pca_plot_by_clusters, use_container_width=True)  # Plot 2 in the second column
+                with col3:
+                    st.pyplot(hierarchial_clustering_dendogram, use_container_width=True)  # Plot 3 in the first column
+                with col4:
+                    st.write("Cluster Assignment Table")
+                    st.dataframe(cluster_assignment_table, use_container_width=True)
 
-        # # Row 2: Another two plots side by side
-        col3, col4 = st.columns(2)
-        
-        with col3:
-            st.pyplot(hierarchial_clustering_dendogram, use_container_width=True)  # Plot 3 in the first column
-        with col4:
-            st.write("Cluster Assignment Table")
-            st.dataframe(cluster_assignment_table, use_container_width=True)
+            with clust_tab2:
+                #st.write("will integrate umap here")
+                umap_plot = vis.plot_umap()
+                st.plotly_chart(umap_plot, use_container_width=True)
 
 with st.sidebar:
     create_download_button(figures_dict)
