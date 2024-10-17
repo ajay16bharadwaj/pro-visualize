@@ -126,7 +126,7 @@ with st.container():
     with col1:
         with st.expander("Analysis Input Preview"):
             if analysis_upload is not None:
-                analysis_df = load_data(analysis_upload)
+                analysis_df = load_data(analysis_upload) # type: ignore
                 st.dataframe(analysis_df)
                 analysis_status = True
             else:
@@ -135,7 +135,7 @@ with st.container():
     with col2:
         with st.expander("Protein Input Preview"):
             if protein_level_upload is not None:
-                protein_level_upload = load_data(protein_level_upload)
+                protein_level_upload = load_data(protein_level_upload) # type: ignore
                 st.dataframe(protein_level_upload)
                 protein_level_status = True
             else:
@@ -158,7 +158,7 @@ with tab1:
         log2fc_threshold = st.slider('Log2 Fold Change Threshold', 0.0, volcano_info['log2FC'].max(), value=0.6, key='volcano_fc')
         fdr_threshold = st.slider('Imputed FDR Threshold', 0.0, 1.0, 0.05, key='volcano_fdr')
         comparison_input = st.selectbox('Which comparison', condition_groups, index=1 )
-        fig = plot_volcano(condition_groups[comparison_input], log2fc_threshold, fdr_threshold)
+        fig = plot_volcano(condition_groups[comparison_input], log2fc_threshold, fdr_threshold) # type: ignore
         st.plotly_chart(fig, theme="streamlit", use_container_width=True)
 
 #heatmaps
@@ -166,7 +166,7 @@ with tab1:
 with tab2:
     if protein_level_status and analysis_status:
 
-        pt_level = protein_level_upload.copy()
+        pt_level = protein_level_upload.copy() # type: ignore
 
         #cleaning pt_level
         # Replace Inf, -Inf with NaN first (if you specifically only want to replace Inf values)
@@ -186,7 +186,7 @@ with tab2:
         heatmap_fdr_threshold = st.slider('Imputed FDR Threshold', 0.0, 1.0, 0.05, key='heatmap_fdr')
 
         #Need to get top ten DEP's and plot that 
-        df = condition_groups[heatmap_comparison_input]
+        df = condition_groups[heatmap_comparison_input] # type: ignore
         dep_list_df = df[(df['Imputed.FDR'] < heatmap_fdr_threshold) & ((df['log2FC'] < heatmap_log2fc_threshold) | (df['log2FC'] > heatmap_log2fc_threshold)) ]
         
         with st.expander("Differentially expressed proteins"):
