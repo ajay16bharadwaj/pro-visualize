@@ -673,4 +673,59 @@ class ProteinVisualization:
         fig.update_layout(title=f'Heatmap', xaxis_title="samples", yaxis_title="Proteins")
 
         return fig  
+    
+    def plot_correlation_matrix(self):
+        """Plot a correlation matrix using Spearman correlation from raw protein data and adjust layout for better visualization."""
+        # Ensure protein data is loaded
+        if self.protein_data is None:
+            raise ValueError("Protein data not loaded.")
+
+        # Use the raw protein data, setting 'Protein' as the index
+        df = self.protein_data.copy().set_index('Protein')
+
+        # Replace infinite values and fill NaNs with zeros
+        df.replace([np.inf, -np.inf], np.nan, inplace=True)
+        df.fillna(0, inplace=True)
+
+        # Calculate Spearman correlation
+        corr_matrix = df.corr(method='spearman')
+
+        # Create the heatmap using Plotly
+        fig = go.Figure(
+            data=go.Heatmap(
+                z=corr_matrix.values,
+                x=corr_matrix.columns,
+                y=corr_matrix.index,
+                colorscale='RdBu',
+                zmin=-1,
+                zmax=1,
+                colorbar=dict(title='Correlation', titleside='right', tickvals=[-1, -0.5, 0, 0.5, 1]),
+            )
+        )
+
+        # Update layout for better readability
+        fig.update_layout(
+            title='Correlation Matrix - Spearman Correlation',
+            xaxis=dict(
+                title='Samples',
+                tickangle=45,
+                tickfont=dict(size=8),
+                automargin=True,
+                side='bottom'
+            ),
+            yaxis=dict(
+                title='Samples',
+                tickfont=dict(size=8),
+                automargin=True,
+            ),
+            width=800,
+            height=800,
+            margin=dict(l=100, r=20, t=100, b=100),
+            title_font=dict(size=14)
+        )
+        
+        # Set aspect ratio to make it look square
+        fig.update_yaxes(scaleanchor="x", scaleratio=1)
+
+        return fig
         

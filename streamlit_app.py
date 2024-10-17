@@ -267,6 +267,9 @@ with tab4:
         plot_protein_overlap = vis.plot_protein_overlap()
         st.plotly_chart(plot_protein_overlap)
 
+        plot_correlation_matrix = vis.plot_correlation_matrix()
+        st.plotly_chart(plot_correlation_matrix)
+
 
 #this tab will be used for PCA 
 with tab5:
