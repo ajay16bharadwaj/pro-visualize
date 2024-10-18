@@ -267,6 +267,9 @@ with tab4:
         plot_protein_overlap = vis.plot_protein_overlap()
         st.plotly_chart(plot_protein_overlap)
 
+        plot_intensity_density = vis.plot_intensity_density()
+        st.plotly_chart(plot_intensity_density)
+
         plot_correlation_matrix = vis.plot_correlation_matrix()
         st.plotly_chart(plot_correlation_matrix)
 
@@ -275,7 +278,7 @@ with tab4:
 with tab5:
 
     if protein_level_status and annotation_status:
-        clust_tab1, clust_tab2 = st.tabs(["PCA", "UMAP"])
+        clust_tab1, clust_tab2, clust_tab3 = st.tabs(["PCA", "UMAP", "T-SNE"])
         with clust_tab1: 
             st.write(' This tab will be used for Clustering')
             # Placeholder for four example plots
@@ -314,6 +317,10 @@ with tab5:
                 #st.write("will integrate umap here")
                 umap_plot = vis.plot_umap()
                 st.plotly_chart(umap_plot, use_container_width=True)
+
+            with clust_tab3:
+                tsne_plot = vis.plot_tsne()
+                st.plotly_chart(tsne_plot, use_container_width=True)
 
 with st.sidebar:
     create_download_button(figures_dict)
