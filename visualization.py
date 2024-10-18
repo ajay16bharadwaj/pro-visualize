@@ -1,3 +1,4 @@
+from multiprocessing.managers import ValueProxy
 import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
@@ -10,6 +11,8 @@ import matplotlib.pyplot as plt
 import re
 from compute_functions import *
 import dash_bio
+import requests
+from requests.adapters import HTTPAdapter, Retry
 
 class ProteinVisualization:
 
@@ -26,6 +29,7 @@ class ProteinVisualization:
         self.protein_data = None
         self.annotation_info = None
         self.dep_info = None
+        self.protein_data_annotated = None
         self.uniprot_info = None
         self.protein_data_for_pca = None
         self.analysis_with_annotation = None
@@ -74,13 +78,17 @@ class ProteinVisualization:
             raise ValueError(f"No missing values allowed in the annotation file.")
         
         return annotation_info, LIMIT_SAMPLE_COMPARISONS
+                
 
     def preprocess_for_pca(self):
         """Preprocess protein data specifically for PCA or other plots that require normalization."""
         df = self.protein_data.copy()
         df.replace([np.inf, -np.inf], np.nan, inplace=True)
         df.fillna(0, inplace=True)
-        self.protein_data_for_pca = df.set_index('Protein')
+        #keep only Protein information for all the samples: 
+        sample_columns = list(self.annotation_info.SampleName.unique())
+        filtered_df = df[['Protein'] + [col for col in sample_columns if col in df.columns]]
+        self.protein_data_for_pca = filtered_df.set_index('Protein')
         return self.protein_data_for_pca 
 
     def preprocess_for_heatmaps(self):
@@ -313,7 +321,7 @@ class ProteinVisualization:
         """Fetch UniProt information for the proteins in the dataset."""
         if self.uniprot_info is None:
            
-            proteins =   list(set(self.dep_info['Protein'].tolist()))# type: ignore # Get unique proteins from the index
+            proteins =   list(set(self.protein_data['Protein'].tolist()))# type: ignore # Get unique proteins from the index
             protein_names = []
 
             # Remove fasta descriptions if present and get UniProt IDs
@@ -395,18 +403,29 @@ class ProteinVisualization:
             print("Couldn't fetch UniProt Annotation at the moment.")
             return pd.DataFrame()
 
-    def merge_uniprot2proteome(self):
+    def merge_uniprot2proteome(self, df):
         """Merge DEP data with UniProt information."""
         if self.uniprot_info is None:
             raise ValueError("UniProt information is not loaded.")
-        self.dep_info['ProteinIds'] = self.dep_info['Protein'].apply(self._get_uniprot_ids)
-        merged_df = pd.merge(self.uniprot_info, self.dep_info, on="ProteinIds", how="right")
-        self.analysis_with_annotation = merged_df
+        df['ProteinIds'] = df['Protein'].apply(self._get_uniprot_ids)
+        merged_df = pd.merge(self.uniprot_info, df, on="ProteinIds", how="right")
+        return merged_df
+    
+    def merge_dep_ptlevel(self, dep_df, pt_level):
+        df2_selected = pt_level[['Protein', 'Gene Name', 'Protein Description']]
+        merged_df = pd.merge(dep_df, df2_selected, on="Protein", how="left")
+        return merged_df
 
     def volcano_preprocess(self, COL_DEPLABEL):
         """Preprocess for volcano plot by grouping based on DEP label."""
-        if self.analysis_with_annotation is None:
+        if self.dep_info is None:
             raise ValueError("DEP information is not loaded or Uniprot Annotation is non existant")
+        
+        if self.protein_data_annotated is None:
+            raise ValueError("Protein Data is not annotated, please upload annotated protein information")
+        
+        if self.analysis_with_annotation is None:        
+            self.analysis_with_annotation = self.merge_dep_ptlevel(self.dep_info, self.protein_data_annotated)
         
         condition_level = sorted(self.analysis_with_annotation[COL_DEPLABEL].unique())
         self.analysis_with_annotation[COL_DEPLABEL] = pd.Categorical(self.analysis_with_annotation[COL_DEPLABEL], categories=condition_level, ordered=True)
@@ -415,6 +434,11 @@ class ProteinVisualization:
     
     def plot_volcano(self, df, FC, p_val):
         """Generate volcano plot."""
+        if self.protein_data_annotated is None: 
+            raise ValueError("Annotated Protein data is required to display Gene and Protein Description information")
+        
+    
+
         df['sig'] = -np.log10(df[self.COL_DEPSIGNIF])
 
         df['label'] = 'Non-significant'
@@ -554,8 +578,16 @@ class ProteinVisualization:
         if isinstance(protein_list, str):
             protein_list = [protein_list]
         
+        df = self.protein_data.copy()
         # Filter protein data for the specified proteins
-        df_filtered = self.protein_data[self.protein_data['Protein'].isin(protein_list)]
+        #ensure only sample columns are present. 
+        sample_columns = list(self.annotation_info.SampleName.unique())
+        filtered_df = df[['Protein'] + [col for col in sample_columns if col in df.columns]]
+
+
+        #need to set the index and scale it before plotting. 
+
+        df_filtered = filtered_df[filtered_df['Protein'].isin(protein_list)]
         if df_filtered.empty:
             raise ValueError("None of the specified proteins were found in the protein data.")
         
@@ -654,12 +686,18 @@ class ProteinVisualization:
 
         from sklearn.preprocessing import MinMaxScaler
 
+        #ensure only numeric values from samples get passed on to the plot. 
+        # Get the list of sample names from annotation information
+        sample_columns = list(self.annotation_info.SampleName.unique())
+        filtered_df = df[['Protein'] + [col for col in sample_columns if col in df.columns]]
+
+
         #need to set the index and scale it before plotting. 
-        df = df.set_index('Protein')
+        filtered_df = filtered_df.set_index('Protein')
         #df = df.drop('Protein', axis=1)
 
         scaler = MinMaxScaler()
-        df1_norm = pd.DataFrame(scaler.fit_transform(df), columns=df.columns, index=df.index)
+        df1_norm = pd.DataFrame(scaler.fit_transform(filtered_df), columns=filtered_df.columns, index=filtered_df.index)
 
 
         fig = dash_bio.Clustergram(
@@ -681,14 +719,17 @@ class ProteinVisualization:
             raise ValueError("Protein data not loaded.")
 
         # Use the raw protein data, setting 'Protein' as the index
-        df = self.protein_data.copy().set_index('Protein')
+        df = self.protein_data.copy()
+        sample_columns = list(self.annotation_info.SampleName.unique())
+        filtered_df = df[['Protein'] + [col for col in sample_columns if col in df.columns]]
+        filtered_df = filtered_df.set_index('Protein')
 
         # Replace infinite values and fill NaNs with zeros
-        df.replace([np.inf, -np.inf], np.nan, inplace=True)
-        df.fillna(0, inplace=True)
+        filtered_df.replace([np.inf, -np.inf], np.nan, inplace=True)
+        filtered_df.fillna(0, inplace=True)
 
         # Calculate Spearman correlation
-        corr_matrix = df.corr(method='spearman')
+        corr_matrix = filtered_df.corr(method='spearman')
 
         # Create the heatmap using Plotly
         fig = go.Figure(
@@ -863,17 +904,22 @@ class ProteinVisualization:
         
         # Merge protein data with annotation info
         df = self.protein_data.copy()
-        df = pd.melt(df, id_vars=['Protein'], var_name='Sample', value_name='Intensity')
+        #ensure only sample columns are present. 
+        sample_columns = list(self.annotation_info.SampleName.unique())
+        filtered_df = df[['Protein'] + [col for col in sample_columns if col in df.columns]]
+
+
+        filtered_df = pd.melt(filtered_df, id_vars=['Protein'], var_name='Sample', value_name='Intensity')
         
         # Log transformation to make the data more normally distributed
-        df['log10(Intensity)'] = np.log10(df['Intensity'].replace(0, np.nan))
+        filtered_df['log10(Intensity)'] = np.log10(filtered_df['Intensity'].replace(0, np.nan))
         
         # Merge with annotation info to add grouping
-        df = df.merge(self.annotation_info, left_on='Sample', right_on='SampleName', how='left')
+        filtered_df = filtered_df.merge(self.annotation_info, left_on='Sample', right_on='SampleName', how='left')
         
         # Create the density plot using plotly express
         fig = px.histogram(
-            df,
+            filtered_df,
             x='log10(Intensity)',
             color='Sample',
             facet_col='Group',

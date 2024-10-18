@@ -99,12 +99,10 @@ with st.container():
         with st.expander("Analysis Input Preview"):
             if analysis_upload is not None:
                 #analysis_df = load_data(analysis_upload) # type: ignore
-                # I'm going to load analysis with annotation to save copmutation time, will get back to this implementation after all the visualizations are integrated. 
-                analysis_df = load_data(analysis_upload)
-                #vis.load_dep_data(analysis_upload) # type: ignore
-                vis.dep_info = analysis_df.copy()
-                vis.analysis_with_annotation = analysis_df.copy()
-                st.dataframe(vis.analysis_with_annotation)
+                vis.load_dep_data(analysis_upload) # type: ignore
+                #vis.dep_info = analysis_df.copy()
+                #vis.analysis_with_annotation = analysis_df.copy()
+                st.dataframe(vis.dep_info)
                 analysis_status = True
             else:
                 st.info(" Preview available after file upload", icon="ℹ️")
@@ -123,7 +121,9 @@ with st.container():
             if protein_level_upload is not None:
                 #protein_level_upload = load_data(protein_level_upload)
                 vis.load_protein_data(protein_level_upload) # type: ignore
-                st.dataframe(vis.protein_data)
+                #upload pt level with uniport annotation - to save time. 
+                vis.protein_data_annotated = vis.protein_data.copy()
+                st.dataframe(vis.protein_data_annotated)
                 protein_level_status = True
             else:
                 st.info(" Preview available after file upload", icon="ℹ️")
@@ -142,11 +142,12 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs(["Volcano Plot", "Heat Maps", "Violin Plo
 with tab1:
     if analysis_status and annotation_file_upload:
         #st.write('this tab will be used for volcano plot')
-        volcano_info = vis.analysis_with_annotation.copy() # type: ignore
+        volcano_info = vis.dep_info.copy() # type: ignore
         condition_groups = vis.volcano_preprocess(COL_DEPLABEL) # type: ignore
         volcano_log2fc_threshold = st.slider('Log2 Fold Change Threshold', 0.0, volcano_info['log2FC'].max(), value=0.6, key='volcano_fc') # type: ignore
         volcano_fdr_threshold = st.slider('Imputed FDR Threshold', 0.0, 1.0, 0.05, key='volcano_fdr')
-        volcano_comparison_input = st.selectbox('Which comparison', condition_groups, index=1, key="volcano_comparison_input" )        
+        volcano_comparison_input = st.selectbox('Which comparison', condition_groups, index=1, key="volcano_comparison_input" )   
+        #st.dataframe(condition_groups[volcano_comparison_input])     
         fig = vis.plot_volcano(condition_groups[volcano_comparison_input], volcano_log2fc_threshold, volcano_fdr_threshold)
         st.plotly_chart(fig, theme="streamlit", use_container_width=True)
         figures_dict["Volcano Plot"] = fig
@@ -160,7 +161,7 @@ with tab2:
         if protein_level_status and analysis_status and annotation_status:
 
             pt_level = vis.preprocess_for_heatmaps()
-            heatmap_info = vis.analysis_with_annotation.copy() #type:ignore
+            heatmap_info = vis.dep_info.copy() #type:ignore
             heatmap_condition_groups = vis.volcano_preprocess(COL_DEPLABEL) # type: ignore
             heatmap_log2fc_threshold = st.slider('Log2 Fold Change Threshold', 0.0, heatmap_info['log2FC'].max(), value=0.6, key='heatmap_fc') # type: ignore
             heatmap_fdr_threshold = st.slider('Imputed FDR Threshold', 0.0, 1.0, 0.05, key='heatmap_fdr')
@@ -211,7 +212,7 @@ with tab2:
 with tab3:
     st.write('this tab will be used for violin plot')
     if protein_level_status and analysis_status and annotation_status:
-        violin_info = vis.analysis_with_annotation.copy() #type:ignore
+        violin_info = vis.dep_info.copy() #type:ignore
         violin_condition_groups = vis.volcano_preprocess(COL_DEPLABEL) # type: ignore
         violin_log2fc_threshold = st.slider('Log2 Fold Change Threshold', 0.0, violin_info['log2FC'].max(), value=0.6, key='violin_fc') # type: ignore
         violin_fdr_threshold = st.slider('Imputed FDR Threshold', 0.0, 1.0, 0.05, key='violin_fdr')
