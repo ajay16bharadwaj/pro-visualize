@@ -790,3 +790,112 @@ class ProteinVisualization:
 
         return fig
         
+
+    def plot_tsne(self, group_column='Group', n_components=2, perplexity=10):
+        from sklearn.preprocessing import StandardScaler
+        from sklearn.manifold import TSNE
+        """Generate a t-SNE plot for visualizing protein data."""
+        # Ensure that the protein data and annotation info have been loaded
+        if self.protein_data is None or self.annotation_info is None:
+            raise ValueError("Protein data or annotation info not loaded.")
+
+        if self.protein_data_for_pca is None:
+            self.preprocess_for_pca()  # Reusing preprocessing from PCA
+
+        df = self.protein_data_for_pca
+        
+        n_samples = df.T.shape[0]  # Number of samples
+    
+        # Adjust the perplexity if it's higher than n_samples - 1
+        if perplexity >= n_samples:
+            perplexity = max(5, n_samples // 2)
+        
+        # Standardize the data
+        scaler = StandardScaler()
+        scaled_data = scaler.fit_transform(df.T)
+        
+        # Perform t-SNE
+        tsne = TSNE(n_components=n_components, perplexity=perplexity, random_state=42)
+        tsne_components = tsne.fit_transform(scaled_data)
+        tsne_df = pd.DataFrame(data=tsne_components, columns=[f'TSNE{i+1}' for i in range(n_components)])
+        
+        # Step 3: Merge annotation information
+        tsne_df = pd.concat([tsne_df, self.annotation_info.reset_index()], axis=1)
+        
+        # Step 4: Create t-SNE plot colored by annotations
+        fig = px.scatter(
+            tsne_df,
+            x='TSNE1',
+            y='TSNE2',
+            color=group_column,
+            hover_data=['SampleName'],
+            title=f't-SNE Plot - Colored by {group_column}',
+            labels={group_column: 'Groups'},
+            text='SampleName'
+        )
+        
+        # Dynamically adjust the axis scale and the labels positioning
+        fig.update_traces(textposition='top center')
+        
+        fig.update_layout(
+            xaxis_title='t-SNE Component 1',
+            yaxis_title='t-SNE Component 2',
+            width=800,
+            height=600,
+            margin=dict(l=0, r=0, t=40, b=40),
+            showlegend=True,
+        )
+        
+        # Adjust marker size
+        fig.update_traces(marker=dict(size=8))
+        
+        return fig
+    
+    def plot_intensity_density(self):
+        """
+        Create density plots of protein intensities grouped by sample groups.
+        Assumes that the annotation information includes a 'Group' column
+        and that the intensity data is stored in 'protein_data'.
+        """
+        # Ensure protein data and annotation info are loaded
+        if self.protein_data is None or self.annotation_info is None:
+            raise ValueError("Protein data or annotation info not loaded.")
+        
+        # Merge protein data with annotation info
+        df = self.protein_data.copy()
+        df = pd.melt(df, id_vars=['Protein'], var_name='Sample', value_name='Intensity')
+        
+        # Log transformation to make the data more normally distributed
+        df['log10(Intensity)'] = np.log10(df['Intensity'].replace(0, np.nan))
+        
+        # Merge with annotation info to add grouping
+        df = df.merge(self.annotation_info, left_on='Sample', right_on='SampleName', how='left')
+        
+        # Create the density plot using plotly express
+        fig = px.histogram(
+            df,
+            x='log10(Intensity)',
+            color='Sample',
+            facet_col='Group',
+            histnorm='density',
+            nbins=100,
+            opacity=0.7,
+            title='Density Plot of Protein Intensities by Group',
+            labels={'log10(Intensity)': 'log10(Intensity)', 'Group': 'Group'},
+            height=600,
+            width=1000
+        )
+        
+        # Update layout for better visibility
+        fig.update_layout(
+            title_text='Density Plot of Protein Intensities by Group',
+            legend_title='Sample',
+            margin=dict(t=50, l=50, r=50, b=50),
+            xaxis_title='log10(Intensity)',
+            yaxis_title='Density'
+        )
+        
+        # Adjust facet titles for better presentation
+        fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
+        
+        return fig
