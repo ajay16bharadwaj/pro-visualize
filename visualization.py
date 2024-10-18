@@ -945,3 +945,91 @@ class ProteinVisualization:
         fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
         
         return fig
+    
+    def plot_protein_rank_order(self, selected_proteins=[]):
+        """
+        Plot the protein rank order with options to highlight selected proteins.
+        
+        Parameters:
+        - vis: The ProteinVisualization class instance containing the data.
+        - selected_proteins: A list of proteins to highlight on the plot.
+        """
+        # Calculate the average protein intensity and log10 transform it
+        if self.protein_data is None:
+            raise ValueError("Protein data not loaded.")
+
+        # Calculate the average intensity across all samples for each protein
+        df = self.protein_data.copy()
+        sample_columns = list(self.annotation_info.SampleName.unique())
+        filtered_df = df[['Protein'] + [col for col in sample_columns if col in df.columns]]
+        filtered_df = filtered_df.set_index('Protein')
+        avg_intensity = filtered_df.mean(axis=1)
+        avg_intensity_log = np.log10(avg_intensity)
+        
+        # Create a DataFrame with protein ranks
+        rank_df = pd.DataFrame({
+            'Protein': avg_intensity_log.index,
+            'log10_intensity': avg_intensity_log.values
+        }).sort_values('log10_intensity', ascending=False).reset_index(drop=True)
+        
+        # Add rank to the DataFrame
+        rank_df['Protein Rank'] = rank_df.index + 1
+        
+        # Merge with Gene Name and Protein Description for hover information
+        rank_df = pd.merge(
+            rank_df,
+            self.protein_data_annotated[['ProteinIds', 'Gene Name', 'Protein Description']].rename(columns={'ProteinIds': 'Protein'}),
+            on='Protein',
+            how='left'
+        )
+        
+        # Determine if a protein is selected or not
+        rank_df['Selected'] = rank_df['Protein'].apply(lambda x: x in selected_proteins)
+        
+        # Create the Plotly scatter plot
+        fig = px.scatter(
+            rank_df,
+            x='Protein Rank',
+            y='log10_intensity',
+            hover_data=['Protein', 'Gene Name', 'Protein Description'],
+            color='Selected',
+            color_discrete_map={True: 'red', False: 'blue'},
+            title="Protein Rank-Order",
+            labels={'log10_intensity': 'log10 of Average Protein Intensity'}
+        )
+        
+        # Add annotations for selected proteins
+        # Loop for adding annotations with enhanced styling
+        for protein in selected_proteins:
+            protein_row = rank_df[rank_df['Protein'] == protein]
+            if not protein_row.empty:
+                x_value = protein_row['Protein Rank'].values[0]
+                y_value = protein_row['log10_intensity'].values[0]
+                fig.add_annotation(
+                    x=x_value,
+                    y=y_value,
+                    text=protein,  # Text shown near the arrow
+                    showarrow=True,
+                    arrowhead=3,  # Make arrowhead more prominent
+                    ax=30,  # Increase distance of text from the point in x-direction for better visibility
+                    ay=-40,  # Increase distance of text from the point in y-direction for a longer arrow
+                    arrowcolor="blue",  # Change arrow color to blue
+                    arrowsize=2,  # Make the arrowhead larger for better visibility
+                    arrowwidth=2.5,  # Slightly increase the arrow line width
+                    font=dict(
+                        color="blue",  # Change text color to match the arrow color
+                        size=12  # Make the font size larger for better readability
+                    )
+                )
+
+        
+        # Adjust layout
+        fig.update_layout(
+            width=800,
+            height=500,
+            xaxis_title="Protein Rank",
+            yaxis_title="log10(Average Protein Intensity)",
+            showlegend=False
+        )
+        
+        return fig
