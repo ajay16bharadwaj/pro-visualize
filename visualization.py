@@ -13,6 +13,7 @@ from compute_functions import *
 import dash_bio
 import requests
 from requests.adapters import HTTPAdapter, Retry
+from venn import venn
 
 class ProteinVisualization:
 
@@ -1031,5 +1032,22 @@ class ProteinVisualization:
             yaxis_title="log10(Average Protein Intensity)",
             showlegend=False
         )
+        
+        return fig
+    
+    def plot_venn(self, protein_grouped_list, figsize=(8, 6)):
+        """
+        Plot a Venn diagram for proteins across selected groups.
+            
+        Args:
+            protein_grouped_list (dict): Protein list dictionary organized by groups and list of protein sets.
+            figsize (tuple): Size of the figure in inches (width, height).
+            
+        Returns:
+            fig: Matplotlib fig containing the Venn diagram.
+        """
+        # Create the figure with the specified size.
+        fig, ax = plt.subplots(figsize=figsize)
+        venn(protein_grouped_list, ax=ax)
         
         return fig

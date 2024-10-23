@@ -136,7 +136,7 @@ with st.container():
  
 
 #initializing tabs
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["Volcano Plot", "Heat Maps", "Violin Plot", "Quantification", "Clustering"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Volcano Plot", "Heat Maps", "Violin Plot", "Quantification", "Clustering", "Venn Diagrams"])
 
 #volcano plot - to set interactive FDR and FC thresholds
 with tab1:
@@ -348,6 +348,35 @@ with tab5:
             with clust_tab3:
                 tsne_plot = vis.plot_tsne()
                 st.plotly_chart(tsne_plot, use_container_width=True)
+
+    
+with tab6:
+    st.write("This will be used for venn diagrams")
+
+    #select box for choosing custom groups
+    #venn_custom_group_select_checkbox = st.checkbox(' Choose custom groups ', key='venn_group_select')
+    df = vis.dep_info.copy()
+
+    #if venn_custom_group_select_checkbox:
+    all_groups = df[vis.COL_DEPLABEL].unique().tolist()
+    selected_groups = st.multiselect("Select groups to include", all_groups, default=all_groups)
+
+    filtered_df = df[df[vis.COL_DEPLABEL].isin(selected_groups)]
+
+    protein_sets = {
+        group: set(filtered_df[filtered_df[vis.COL_DEPLABEL] == group]['Protein'])
+        for group in filtered_df[vis.COL_DEPLABEL].unique()
+    }
+    
+    venn_diagram = vis.plot_venn(protein_sets)
+    # Save the figure to a BytesIO object.
+    img_bytes = BytesIO()
+    venn_diagram.savefig(img_bytes, format='png', bbox_inches='tight')
+    img_bytes.seek(0)
+
+    # Use st.image to display the image with a specified width.
+    st.image(img_bytes, caption='Venn Diagram', use_column_width=False, width=600)
+
 
 with st.sidebar:
     create_download_button(figures_dict)
