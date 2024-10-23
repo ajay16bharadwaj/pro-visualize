@@ -136,7 +136,7 @@ with st.container():
  
 
 #initializing tabs
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Volcano Plot", "Heat Maps", "Violin Plot", "Quantification", "Clustering", "Venn Diagrams"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Volcano Plot", "Heat Maps", "Violin Plot", "Quantification", "Clustering", "Venn Diagram"])
 
 #volcano plot - to set interactive FDR and FC thresholds
 with tab1:
