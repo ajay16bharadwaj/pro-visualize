@@ -22,12 +22,30 @@ color_map = {
     }
 
 ######################################
-# functions
+# functions - used for caching? 
 ######################################
 @st.cache_data
 def load_data(path):
     df = pd.read_csv(path,sep = '\t')
     return df
+
+@st.cache_data 
+def cached_get_all_enrichment(_vis, protein_list, organism):
+    """
+    Cached version of the enrichment analysis method.
+    This function calls the method from the `vis` object and caches the result.
+    
+    Args:
+        vis: Instance of the class containing the `get_all_enrichment` method.
+        protein_list (list): List of proteins for enrichment analysis.
+        organism (str): The organism for the analysis (e.g., 'human').
+
+    Returns:
+        pd.DataFrame: The complete enrichment DataFrame.
+        dict: A dictionary of DataFrames for different sources.
+    """
+    enrichment_df, source_dict =  _vis.get_all_enrichment(protein_list, organism)
+    return enrichment_df, source_dict
 
 
 
@@ -93,9 +111,9 @@ vis = ProteinVisualization()
 
 with st.container():
 
-    col1, col2, col3 = st.columns(3)
+    preview_col1, preview_col2, preview_col3 = st.columns(3)
 
-    with col1:
+    with preview_col1:
         with st.expander("Analysis Input Preview"):
             if analysis_upload is not None:
                 #analysis_df = load_data(analysis_upload) # type: ignore
@@ -106,7 +124,7 @@ with st.container():
                 analysis_status = True
             else:
                 st.info(" Preview available after file upload", icon="ℹ️")
-    with col2:
+    with preview_col2:
         with st.expander("Annotation Preview"):
             if annotation_file_upload is not None:
                 #annotation_file_upload = load_data(annotation_file_upload)
@@ -116,7 +134,7 @@ with st.container():
             else:
                 st.info(" Preview available after file upload", icon="ℹ️")
 
-    with col3:
+    with preview_col3:
         with st.expander("Protein Input Preview"):
             if protein_level_upload is not None:
                 #protein_level_upload = load_data(protein_level_upload)
@@ -136,7 +154,7 @@ with st.container():
  
 
 #initializing tabs
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Volcano Plot", "Heat Maps", "Violin Plot", "Quantification", "Clustering", "Venn Diagram"])
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Volcano Plot", "Heat Maps", "Violin Plot", "Quantification", "Clustering", "Venn Diagram", "Functional Analysis and Biological Annotations"])
 
 #volcano plot - to set interactive FDR and FC thresholds
 with tab1:
@@ -169,7 +187,7 @@ with tab2:
 
             #getting the top 10 differentially expressed proteins and plotting that 
             df = heatmap_condition_groups[heatmap_comparison_input]
-            dep_list_df = df[(df['Imputed.FDR'] < heatmap_fdr_threshold) & ((df['log2FC'] < heatmap_log2fc_threshold) | (df['log2FC'] > heatmap_log2fc_threshold)) ]
+            dep_list_df = df[(df['Imputed.FDR'] < heatmap_fdr_threshold) & ((df['log2FC'] < -(heatmap_log2fc_threshold)) | (df['log2FC'] > heatmap_log2fc_threshold)) ]
 
             #protein level preprocessing for violin plot
             pt_level_for_heatmap = vis.preprocess_for_heatmaps()
@@ -220,7 +238,7 @@ with tab3:
 
         #getting the top 10 differentially expressed proteins and plotting that 
         df = violin_condition_groups[violin_comparison_input]
-        dep_list_df = df[(df['Imputed.FDR'] < violin_fdr_threshold) & ((df['log2FC'] < violin_log2fc_threshold) | (df['log2FC'] > violin_log2fc_threshold)) ]
+        dep_list_df = df[(df['Imputed.FDR'] < violin_fdr_threshold) & ((df['log2FC'] < -(violin_log2fc_threshold)) | (df['log2FC'] > violin_log2fc_threshold)) ]
 
         #protein level preprocessing for violin plot
         pt_level_for_violin = vis.preprocess_for_violin_plot()
@@ -355,27 +373,201 @@ with tab6:
 
     #select box for choosing custom groups
     #venn_custom_group_select_checkbox = st.checkbox(' Choose custom groups ', key='venn_group_select')
-    df = vis.dep_info.copy()
+    if analysis_status:
+        
+        df = vis.dep_info.copy()
 
-    #if venn_custom_group_select_checkbox:
-    all_groups = df[vis.COL_DEPLABEL].unique().tolist()
-    selected_groups = st.multiselect("Select groups to include", all_groups, default=all_groups)
+        #if venn_custom_group_select_checkbox:
+        all_groups = df[vis.COL_DEPLABEL].unique().tolist()
+        selected_groups = st.multiselect("Select groups to include", all_groups, default=all_groups)
 
-    filtered_df = df[df[vis.COL_DEPLABEL].isin(selected_groups)]
+        filtered_df = df[df[vis.COL_DEPLABEL].isin(selected_groups)]
 
-    protein_sets = {
-        group: set(filtered_df[filtered_df[vis.COL_DEPLABEL] == group]['Protein'])
-        for group in filtered_df[vis.COL_DEPLABEL].unique()
-    }
+        protein_sets = {
+            group: set(filtered_df[filtered_df[vis.COL_DEPLABEL] == group]['Protein'])
+            for group in filtered_df[vis.COL_DEPLABEL].unique()
+        }
+        
+        venn_diagram = vis.plot_venn(protein_sets)
+        # Save the figure to a BytesIO object.
+        img_bytes = BytesIO()
+        venn_diagram.savefig(img_bytes, format='png', bbox_inches='tight')
+        img_bytes.seek(0)
+
+        # Use st.image to display the image with a specified width.
+        st.image(img_bytes, caption='Venn Diagram', use_column_width=False, width=600)
+
+
+with tab7:
+    st.write("This tab will be used for Biological annotations")
+
     
-    venn_diagram = vis.plot_venn(protein_sets)
-    # Save the figure to a BytesIO object.
-    img_bytes = BytesIO()
-    venn_diagram.savefig(img_bytes, format='png', bbox_inches='tight')
-    img_bytes.seek(0)
+    if protein_level_status and annotation_status and analysis_status:
+        df = vis.dep_info.copy() # type: ignore
+        anaysis_condition_groups = vis.volcano_preprocess(COL_DEPLABEL) # type: ignore
+        analysis_log2fc_threshold = st.slider('Log2 Fold Change Threshold', 0.0, df['log2FC'].max(), value=0.6, key='analysis_fc') # type: ignore
+        analysis_fdr_threshold = st.slider('Imputed FDR Threshold', 0.0, 1.0, 0.05, key='analysis_fdr')
+        analysis_comparison_input = st.selectbox('Which comparison', anaysis_condition_groups, index=1, key="analysis_comparison_input" )
+        organism_input = st.selectbox(' Choose your organism', list(vis.organism_dict.keys()), index=0, key="organism_input")
 
-    # Use st.image to display the image with a specified width.
-    st.image(img_bytes, caption='Venn Diagram', use_column_width=False, width=600)
+        #choosing comparison based filtered df
+        filtered_df = anaysis_condition_groups[analysis_comparison_input]
+        #getting the list of differentially expressed proteins for that comparison
+        dep_list_df = filtered_df[(filtered_df['Imputed.FDR'] < analysis_fdr_threshold) & ((filtered_df['log2FC'] < -(analysis_log2fc_threshold)) | (filtered_df['log2FC'] > analysis_log2fc_threshold)) ]
+        if dep_list_df.empty:
+            st.warning("No differentially expressed proteins found for the selected comparison. Please select a different comparison.")
+            st.stop()  # Stops the execution here, so the user has to select a valid comparison.
+        enrichment_df = None
+        source_dict = None
+
+        #getting the terms with this set of significant proteins. 
+        ea, go_cc, go_mf, go_bp, kegg = st.tabs(['Comprehensive Enrichment Analysis','GO Cellular Component Encrichment', 'GO Molecular Function', 'GO Biological Process', 'KEGG Biological Pathways'])
+
+        with ea:
+            enrichment_df, source_dict =  cached_get_all_enrichment(vis, list(dep_list_df['Protein']), organism_input)
+            ea_manhattan_plot = vis.plot_manhattan(enrichment_df, category_name="Comprehensive Enrichment Analysis")
+            st.plotly_chart(ea_manhattan_plot)
+
+        with go_cc:
+            # Column split for table and plot display with a 70-30 ratio.
+            go_cc_col1, go_cc_col2 = st.columns([0.7, 0.3])
+            if not enrichment_df.empty and source_dict is not None:
+                #cc_df = vis.get_go_enrichment(list(dep_list_df['Protein']), go_category="GO:CC", organism=organism_input)
+                if "GO:CC" in list(source_dict.keys()):
+                    cc_df = source_dict['GO:CC']
+                    
+                    if not cc_df.empty:
+                    # Use a checkbox to allow users to select custom GO terms.
+                        with go_cc_col2:
+                            go_cc_custom_term_select = st.checkbox('Choose custom GO Terms', key='go_cc_custom_term_select')
+                            # Display a table for selecting custom GO terms if the checkbox is checked.
+                            if go_cc_custom_term_select:
+                                cc_selected_terms = dataframe_with_selections(cc_df, "go_cc_df_select")
+                                with st.expander("Your selection"):
+                                    st.write(cc_selected_terms)
+                            else:
+                                cc_selected_terms = None
+
+                        # Display the plot in the left column.
+                        with go_cc_col1:
+                            if go_cc_custom_term_select and cc_selected_terms is not None and not cc_selected_terms.empty:
+                                # If custom terms are selected, plot based on the selected terms.
+                                filtered_fig_cc, filtered_ax_cc = vis.plot_go_dotplot(cc_selected_terms, category_name="Cellular Component")
+                                st.pyplot(filtered_fig_cc)
+                            else:
+                                # Default plot with the top 10 GO terms.
+                                fig_cc, ax_cc = vis.plot_go_dotplot(cc_df.sort_values(by='q_value').head(10), category_name="Cellular Component")
+                                st.pyplot(fig_cc)
+                else:
+                    st.warning('No Cellular Componenets were found enriched for this comparison')
+                        
+            with go_mf:
+                go_mf_col1, go_mf_col2 = st.columns([0.7, 0.3])
+                if not enrichment_df.empty and source_dict is not None:
+                    #mf_df = vis.get_go_enrichment(list(dep_list_df['Protein']), go_category="GO:MF", organism=organism_input)
+                    if "GO:MF" in list(source_dict.keys()):
+                        mf_df = source_dict['GO:MF']
+                        
+                        if not mf_df.empty:
+                        # Use a checkbox to allow users to select custom GO terms.
+                            with go_mf_col2:
+                                go_mf_custom_term_select = st.checkbox('Choose custom GO Terms', key='go_mf_custom_term_select')
+                                # Display a table for selecting custom GO terms if the checkbox is checked.
+                                if go_mf_custom_term_select:
+                                    mf_selected_terms = dataframe_with_selections(mf_df, "go_mf_df_select")
+                                    with st.expander("Your selection"):
+                                        st.write(mf_selected_terms)
+                                else:
+                                    mf_selected_terms = None
+
+                            # Display the plot in the left column.
+                            with go_mf_col1:
+                                if go_mf_custom_term_select and mf_selected_terms is not None and not mf_selected_terms.empty:
+                                    # If custom terms are selected, plot based on the selected terms.
+                                    filtered_fig_mf, filtered_ax_mf = vis.plot_go_dotplot(mf_selected_terms, category_name="Cellular Component")
+                                    st.pyplot(filtered_fig_mf)
+                                else:
+                                    # Default plot with the top 10 GO terms.
+                                    fig_mf, ax_mf = vis.plot_go_dotplot(mf_df.sort_values(by='q_value').head(10), category_name="Cellular Component")
+                                    st.pyplot(fig_mf)
+                    else:
+                        st.warning("No Molecular Functions were found enriched with these set of Differentially Expressed Proteins")
+
+            with go_bp:
+                go_bp_col1, go_bp_col2 = st.columns([0.7, 0.3])
+                if not enrichment_df.empty and source_dict is not None:
+                    #bp_df = vis.get_go_enrichment(list(dep_list_df['Protein']), go_category="GO:BP", organism=organism_input)
+                    if "GO:BP" in list(source_dict.keys()):
+                        bp_df = source_dict['GO:BP']
+                        
+                        if not bp_df.empty:
+                        # Use a checkbox to allow users to select custom GO terms.
+                            with go_bp_col2:
+                                go_bp_custom_term_select = st.checkbox('Choose custom GO Terms', key='go_bp_custom_term_select')
+                                # Display a table for selecting custom GO terms if the checkbox is checked.
+                                if go_bp_custom_term_select:
+                                    bp_selected_terms = dataframe_with_selections(bp_df, "go_bp_df_select")
+                                    with st.expander("Your selection"):
+                                        st.write(bp_selected_terms)
+                                else:
+                                    bp_selected_terms = None
+
+                            # Display the plot in the left column.
+                            with go_bp_col1:
+                                if go_bp_custom_term_select and bp_selected_terms is not None and not bp_selected_terms.empty:
+                                    # If custom terms are selected, plot based on the selected terms.
+                                    filtered_fig_bp, filtered_ax_bp = vis.plot_go_dotplot(bp_selected_terms, category_name="Cellular Component")
+                                    st.pyplot(filtered_fig_bp)
+                                else:
+                                    # Default plot with the top 10 GO terms.
+                                    fig_bp, ax_bp = vis.plot_go_dotplot(bp_df.sort_values(by='q_value').head(10), category_name="Cellular Component")
+                                    st.pyplot(fig_bp)
+                    else: 
+                        st.warning("No Biological Processes were found enriched in GO for these set of Proteins selected")
+
+                
+            with kegg:
+                kegg_col1, kegg_col2 = st.columns([0.7, 0.3])
+                if not enrichment_df.empty and source_dict is not None:
+                    #kegg_df = vis.get_go_enrichment(list(dep_list_df['Protein']), go_category="GO:kegg", organism=organism_input)
+
+                    if "KEGG" in list(source_dict.keys()):
+                        kegg_df = source_dict['GO:KEGG']
+
+                        if not kegg_df.empty:
+                        
+                            # Use a checkbox to allow users to select custom GO terms.
+                            with kegg_col2:
+                                kegg_custom_term_select = st.checkbox('Choose custom GO Terms', key='kegg_custom_term_select')
+                                # Display a table for selecting custom GO terms if the checkbox is checked.
+                                if kegg_custom_term_select:
+                                    kegg_selected_terms = dataframe_with_selections(kegg_df, "kegg_df_select")
+                                    with st.expander("Your selection"):
+                                        st.write(kegg_selected_terms)
+                                else:
+                                    kegg_selected_terms = None
+
+                            # Display the plot in the left column.
+                            with kegg_col1:
+                                if kegg_custom_term_select and kegg_selected_terms is not None and not kegg_selected_terms.empty:
+                                    # If custom terms are selected, plot based on the selected terms.
+                                    filtered_fig_kegg, filtered_ax_kegg = vis.plot_go_dotplot(kegg_selected_terms, category_name="Cellular Component")
+                                    st.pyplot(filtered_fig_kegg)
+                                else:
+                                    # Default plot with the top 10 GO terms.
+                                    fig_kegg, ax_kegg = vis.plot_go_dotplot(kegg_df.sort_values(by='q_value').head(10), category_name="Cellular Component")
+                                    st.pyplot(fig_kegg)
+                    else:
+                        st.warning("No KEGG pathways were enriched for this set of Differentially Expressed proteins")
+                else:
+                    st.warning("Enrichment analysis data is not available or no pathways were identified")
+
+
+                
+
+
+            
+
 
 
 with st.sidebar:

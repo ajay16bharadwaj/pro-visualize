@@ -14,6 +14,8 @@ import dash_bio
 import requests
 from requests.adapters import HTTPAdapter, Retry
 from venn import venn
+from gprofiler import GProfiler
+import seaborn as sns
 
 class ProteinVisualization:
 
@@ -25,6 +27,20 @@ class ProteinVisualization:
             'Up-regulated': '#D55E00',
             'Non-significant': '#999999'
         }
+    
+    organism_dict = {
+    "human": "hsapiens",
+    "mouse": "mmusculus",
+    "rat": "rnorvegicus",
+    "zebrafish": "drerio",
+    "fruit fly": "dmelanogaster",
+    "worm": "celegans",
+    "yeast": "scerevisiae",
+    "arabidopsis": "athaliana",
+    "pig": "sscrofa",
+    "cow": "btaurus",
+    "chicken": "ggallus"
+}
     
     def __init__(self):
         self.protein_data = None
@@ -1051,3 +1067,264 @@ class ProteinVisualization:
         venn(protein_grouped_list, ax=ax)
         
         return fig
+    
+    def _get_gprofiler_instance(self):
+    # Ensure that a fresh instance of GProfiler is created every time.
+        return GProfiler()
+    
+    def get_go_enrichment(self, protein_list, go_category="GO:BP", organism="human"):
+        """
+        Perform GO enrichment analysis for a list of proteins using g:Profiler.
+
+        Args:
+            protein_list (list): List of protein identifiers (e.g., UniProt IDs).
+            go_category (str): GO category to filter ('GO:BP', 'GO:MF', 'GO:CC').
+                            'GO:BP' for Biological Process, 'GO:MF' for Molecular Function,
+                            'GO:CC' for Cellular Component.
+            organism (str): Organism name (e.g., 'human', 'mouse', 'rat'). Uses organism_dict for conversion.
+
+        Returns:
+            pd.DataFrame: A DataFrame with enriched GO terms, including q-values and the number of proteins associated with each term.
+        """
+        # Convert organism name to g:Profiler's ID.
+        if organism.lower() not in self.organism_dict:
+            raise ValueError(f"Organism '{organism}' is not recognized. Available options: {list(self.organism_dict.keys())}")
+        
+        gprofiler_organism = self.organism_dict[organism.lower()]
+
+        # Initialize g:Profiler.
+        gp = self._get_gprofiler_instance()
+        
+        # Run enrichment analysis.
+        results = gp.profile(
+            organism=gprofiler_organism,
+            query=protein_list,
+            sources=[go_category]  # Filter by the specified GO category.
+        )
+
+        results_df = pd.DataFrame(results)
+
+        # Check if the results DataFrame is not empty before proceeding.
+        if results_df.empty:
+            return pd.DataFrame()  # Return an empty DataFrame if no results.
+
+        # Filter columns of interest.
+        results_filtered = results_df[[
+            'native',               # GO term ID.
+            'name',                 # GO term name.
+            'source',               # Category (BP, MF, CC).
+            'p_value',              # Raw p-value.
+            'significant',          # Significance status (True/False).
+            'intersection_size',    # Number of proteins associated with the term.
+            'term_size',            # Total number of entities in the term in the database.
+            'precision',            # Proportion of proteins in the input that are annotated with the term.
+            'recall',               # Proportion of the term that is represented in the input.
+            'query_size',           # Number of proteins in the query.
+            'effective_domain_size' # Effective domain size.
+        ]] # type: ignore
+
+        # Calculate q-values for multiple testing correction.
+        results_filtered['q_value'] = results_filtered['p_value'] * results_filtered['effective_domain_size']
+        results_filtered = results_filtered.sort_values('q_value')
+
+        return results_filtered
+    
+    def plot_go_dotplot(self, go_df, category_name, p_value_col='p_value', intersection_size_col='intersection_size', figsize=(8, 6)):
+        """
+        Plots a dot plot for GO enrichment results.
+        
+        Args:
+            go_df (pd.DataFrame): DataFrame with GO enrichment results.
+            category_name (str): Name of the GO category (e.g., 'Biological Process').
+            p_value_col (str): Column name for the p-values.
+            intersection_size_col (str): Column name for the number of proteins associated with each term.
+            figsize (tuple): Size of the figure.
+        
+        Returns:
+            fig, ax: Matplotlib figure and axis.
+        """
+        # Add a column for -log10(p_value) to make plotting easier.
+        go_df['-log10(p_value)'] = -np.log10(go_df[p_value_col])
+        
+        # Create the plot.
+        fig, ax = plt.subplots(figsize=figsize)
+        sns.scatterplot(
+            data=go_df,
+            x='-log10(p_value)',
+            y='name',  # GO term names.
+            size=intersection_size_col,
+            sizes=(40, 400),  # Adjust the range for bubble sizes.
+            hue=intersection_size_col,
+            palette='viridis',  # You can change the palette if you want.
+            alpha=0.7,
+            ax=ax
+        )
+        
+        # Add labels and title.
+        ax.set_title(f"GO Enrichment Dot Plot for {category_name}")
+        ax.set_xlabel("-log10(p-value)")
+        ax.set_ylabel("GO terms")
+        ax.grid(True, linestyle='--', linewidth=0.7, alpha=0.6)
+
+        # Adjust the legend for size.
+        handles, labels = ax.get_legend_handles_labels()
+        ax.legend(
+            handles=handles[1:], labels=labels[1:], title="Proteins",
+            bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.
+        )
+        
+        return fig, ax
+    
+    def get_all_enrichment(self, protein_list, organism="human"):
+        """
+        Perform comprehensive enrichment analysis for a list of proteins using g:Profiler
+        and split the results into a dictionary of DataFrames based on enrichment sources.
+
+        Args:
+            protein_list (list): List of protein identifiers (e.g., UniProt IDs).
+            organism (str): Organism name (e.g., 'human', 'mouse', 'rat'). Uses organism_dict for conversion.
+
+        Returns:
+            pd.DataFrame: The complete DataFrame with all enrichment results.
+            dict: A dictionary where keys are enrichment sources (e.g., 'GO:CC', 'GO:MF', 'KEGG') and 
+                values are DataFrames containing the enrichment results for each source.
+        """
+        # Convert organism name to g:Profiler's ID.
+        if organism.lower() not in self.organism_dict:
+            raise ValueError(f"Organism '{organism}' is not recognized. Available options: {list(self.organism_dict.keys())}")
+        
+        gprofiler_organism = self.organism_dict[organism.lower()]
+
+        # Initialize g:Profiler.
+        gp = GProfiler()
+        
+        # Run enrichment analysis for all available sources.
+        results = gp.profile(
+            organism=gprofiler_organism,
+            query=protein_list,
+            sources=None  # None means querying all sources supported by g:Profiler.
+        )
+
+        results_df = pd.DataFrame(results)
+
+        # Check if the results DataFrame is not empty before proceeding.
+        if results_df.empty:
+            return pd.DataFrame(), {}  # Return an empty DataFrame and an empty dictionary if no results.
+
+        # Filter columns of interest.
+        results_filtered = results_df[[
+            'native',               # Term ID (e.g., GO term, KEGG pathway ID).
+            'name',                 # Term name (e.g., 'cell migration', 'Ribosome').
+            'source',               # Source (e.g., 'GO:BP', 'GO:CC', 'KEGG', 'REAC').
+            'p_value',              # Raw p-value.
+            'significant',          # Significance status (True/False).
+            'intersection_size',    # Number of proteins associated with the term.
+            'term_size',            # Total number of entities in the term in the database.
+            'precision',            # Proportion of proteins in the input that are annotated with the term.
+            'recall',               # Proportion of the term that is represented in the input.
+            'query_size',           # Number of proteins in the query.
+            'effective_domain_size' # Effective domain size.
+        ]]
+
+        # Calculate q-values for multiple testing correction using the Benjamini-Hochberg procedure.
+        results_filtered['q_value'] = results_filtered['p_value'] * results_filtered['effective_domain_size'] / results_filtered['effective_domain_size'].max()
+        #results_filtered['q_value'] = results_filtered['q_value'].clip(upper=1.0)  # Ensure q-values don't exceed 1.
+
+        # Sort results by q_value for better prioritization.
+        results_filtered = results_filtered.sort_values('q_value')
+
+        # Split the results into separate DataFrames based on the 'source' column.
+        sources = results_filtered['source'].unique()
+        source_dict = {
+            source: results_filtered[results_filtered['source'] == source].reset_index(drop=True)
+            for source in sources
+        }
+
+        # Return the complete DataFrame and the dictionary of DataFrames.
+        return results_filtered, source_dict
+    
+    def plot_manhattan(self, gprofiler_results, category_name="Comprehensive Enrichment Analysis"):
+        """
+        Create a Manhattan-like plot using g:Profiler results, with colored blocks for each source
+        and single labels for each GO category positioned below the x-axis.
+
+        Args:
+            gprofiler_results (pd.DataFrame): DataFrame containing g:Profiler results with 'source', 'name', and 'p_value'.
+            category_name (str): The name of the analysis category to display in the plot title.
+
+        Returns:
+            fig: A Plotly figure object containing the Manhattan-like plot.
+        """
+        # Add a column for -log10(p_value) for better visualization.
+        gprofiler_results['-log10(p_value)'] = -np.log10(gprofiler_results['p_value'])
+
+        # Ensure 'source' and 'native' columns are treated as strings before concatenation.
+        gprofiler_results['term_id'] = gprofiler_results['source'].astype(str) + ":" + gprofiler_results['native'].astype(str)
+
+        # Define categorical ordering for sources to ensure correct grouping.
+        source_order = ['GO:MF', 'GO:BP', 'GO:CC', 'KEGG', 'REAC', 'WP', 'MIRNA', 'TF']
+        gprofiler_results['source'] = pd.Categorical(gprofiler_results['source'], categories=source_order, ordered=True)
+
+        # Create a new column that assigns a sequential position for each term based on its source.
+        gprofiler_results['x_position'] = gprofiler_results.groupby('source').cumcount() + 1
+        gprofiler_results['x_position'] = gprofiler_results['source'].astype(str) + ":" + gprofiler_results['x_position'].astype(str)
+
+        # Create the scatter plot.
+        fig = px.scatter(
+            gprofiler_results,
+            x='x_position',
+            y='-log10(p_value)',
+            color='source',
+            size='intersection_size',
+            hover_data=['name', 'p_value', 'q_value', 'intersection_size'],
+            labels={'x_position': 'Enrichment Terms by Source', '-log10(p_value)': '-log10(p-value)'},
+            title=f"Manhattan-like Plot for {category_name}",
+            category_orders={'source': source_order}
+        )
+
+        # Customize layout for better readability.
+        fig.update_layout(
+            xaxis_title='Enrichment Terms by Source',
+            yaxis_title='-log10(p-value)',
+            showlegend=True,
+            template='plotly_white',
+            height=600,
+            width=1000,
+            xaxis=dict(showticklabels=False)  # Hide detailed x-tick labels.
+        )
+
+        # Add shaded regions for each source category.
+        start_idx = 0
+        for source in source_order:
+            source_data = gprofiler_results[gprofiler_results['source'] == source]
+            if not source_data.empty:
+                end_idx = start_idx + len(source_data)
+                fig.add_shape(
+                    type='rect',
+                    x0=start_idx, x1=end_idx,
+                    y0=0, y1=gprofiler_results['-log10(p_value)'].max(),
+                    fillcolor=px.colors.qualitative.Plotly[source_order.index(source) % len(px.colors.qualitative.Plotly)],
+                    opacity=0.2,
+                    line_width=0
+                )
+
+                # Adjust label position for smaller categories like REAC and MIRNA.
+                offset = 0.5 if len(source_data) < 5 else 0
+                fig.add_annotation(
+                    x=(start_idx + end_idx) / 2 + offset,
+                    y=-0.5,  # Position below the x-axis.
+                    text=source,
+                    showarrow=False,
+                    font=dict(size=12, color="black"),
+                    xanchor="center",
+                    yanchor="top"  # Align text above the annotation point.
+                )
+
+                start_idx = end_idx
+
+        # Adjust marker size range for better visual separation.
+        fig.update_traces(marker=dict(sizemode='area', sizeref=2.*max(gprofiler_results['intersection_size'])/(100**2), sizemin=4))
+
+        return fig
+    
+
