@@ -373,29 +373,64 @@ with tab6:
 
     #select box for choosing custom groups
     #venn_custom_group_select_checkbox = st.checkbox(' Choose custom groups ', key='venn_group_select')
-    if analysis_status:
-        
-        df = vis.dep_info.copy()
+    venn_tab1, venn_tab2 = st.tabs(['Venn Diagram for Proteins Identified', 'Venn Diagram across comparisons'])
+    with venn_tab1: 
+        st.write("For proteins identified")
+        if protein_level_status and annotation_status:
+            group_map = vis.annotation_info.set_index("SampleName")["Group"].to_dict()
+            grouped_samples = vis.annotation_info.groupby("Group")["SampleName"].apply(list)
+            all_groups = list(grouped_samples.keys())
+            selected_groups = st.multiselect("Select groups to include", all_groups, default=all_groups, key='venn_tab1_select')
 
-        #if venn_custom_group_select_checkbox:
-        all_groups = df[vis.COL_DEPLABEL].unique().tolist()
-        selected_groups = st.multiselect("Select groups to include", all_groups, default=all_groups)
+            # Filter to include only the selected groups.
+            selected_samples = {group: samples for group, samples in grouped_samples.items() if group in selected_groups}
 
-        filtered_df = df[df[vis.COL_DEPLABEL].isin(selected_groups)]
+            # Step 4: Create a dictionary with protein sets for each selected group.
+            protein_grouped_list = {}
+            for group, samples in selected_samples.items():
+                # Get a subset of protein_data that includes only the group's samples.
+                group_proteins = vis.protein_data[["ProteinIds"] + samples]
+                
+                # Filter out proteins with NaN values across all samples for that group.
+                identified_proteins = group_proteins.dropna(subset=samples, how="all")["ProteinIds"]
+                
+                # Store the set of identified proteins for this group.
+                protein_grouped_list[group] = set(identified_proteins)
 
-        protein_sets = {
-            group: set(filtered_df[filtered_df[vis.COL_DEPLABEL] == group]['Protein'])
-            for group in filtered_df[vis.COL_DEPLABEL].unique()
-        }
-        
-        venn_diagram = vis.plot_venn(protein_sets)
-        # Save the figure to a BytesIO object.
-        img_bytes = BytesIO()
-        venn_diagram.savefig(img_bytes, format='png', bbox_inches='tight')
-        img_bytes.seek(0)
+            venn_diagram = vis.plot_venn(protein_grouped_list)
+            # Save the figure to a BytesIO object.
+            img_bytes = BytesIO()
+            venn_diagram.savefig(img_bytes, format='png', bbox_inches='tight')
+            img_bytes.seek(0)
 
-        # Use st.image to display the image with a specified width.
-        st.image(img_bytes, caption='Venn Diagram', use_column_width=False, width=600)
+            # Use st.image to display the image with a specified width.
+            st.image(img_bytes, caption='Venn Diagram', use_column_width=False, width=600)
+
+
+    with venn_tab2:
+        if analysis_status:
+            
+            df = vis.dep_info.copy()
+
+            #if venn_custom_group_select_checkbox:
+            all_groups = df[vis.COL_DEPLABEL].unique().tolist()
+            selected_groups = st.multiselect("Select groups to include", all_groups, default=all_groups, key='venn_tab2_select')
+
+            filtered_df = df[df[vis.COL_DEPLABEL].isin(selected_groups)]
+
+            protein_sets = {
+                group: set(filtered_df[filtered_df[vis.COL_DEPLABEL] == group]['Protein'])
+                for group in filtered_df[vis.COL_DEPLABEL].unique()
+            }
+            
+            venn_diagram = vis.plot_venn(protein_sets)
+            # Save the figure to a BytesIO object.
+            img_bytes = BytesIO()
+            venn_diagram.savefig(img_bytes, format='png', bbox_inches='tight')
+            img_bytes.seek(0)
+
+            # Use st.image to display the image with a specified width.
+            st.image(img_bytes, caption='Venn Diagram', use_column_width=False, width=600)
 
 
 with tab7:
