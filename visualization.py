@@ -466,7 +466,20 @@ class ProteinVisualization:
         fig = px.scatter(df, x='log2FC', y='sig', color='label', color_discrete_map=self.color_map, hover_data=['Gene Name', 'Protein Description'])
             
             # Customizing the layout
-        fig.update_layout(title=f'Volcano Plot', xaxis_title="log2 fold change", yaxis_title="-log10(FDR)", legend_title_text='Category')
+        #fig.update_layout(title=f'Volcano Plot with </b>FC = ±{FC} p-value = {p_val} ', xaxis_title="log2 fold change", yaxis_title="-log10(FDR)", legend_title_text='Category')
+
+        fig.update_layout(
+            title={
+                'text': f"Volcano Plot<br><sup>FC = ±{FC} | p-value = {p_val}</sup>",
+                'x': 0.5,
+                'y': 0.95,
+                'xanchor': 'center',
+                'yanchor': 'top'
+            },
+            xaxis_title="log2 fold change",
+            yaxis_title="-log10(FDR)",
+            legend_title_text='Category'
+        )
             
             # Adding horizontal and vertical lines for cutoffs
         fig.add_shape(type="line", x0=-FC, y0=0, x1=-FC, y1=df['sig'].max(), line=dict(color="RoyalBlue", width=2, dash="dot"))

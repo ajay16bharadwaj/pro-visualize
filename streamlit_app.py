@@ -154,7 +154,7 @@ with st.container():
  
 
 #initializing tabs
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Volcano Plot", "Heat Maps", "Violin Plot", "Quantification", "Clustering", "Venn Diagram", "Functional Analysis and Biological Annotations"])
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(["Volcano Plot", "Heat Maps", "Violin Plot", "Quantification", "Clustering", "Venn Diagram", "Functional Analysis and Biological Annotations", "Get Uniprot annotations"])
 
 #volcano plot - to set interactive FDR and FC thresholds
 with tab1:
@@ -596,6 +596,36 @@ with tab7:
                         st.warning("No KEGG pathways were enriched for this set of Differentially Expressed proteins")
                 else:
                     st.warning("Enrichment analysis data is not available or no pathways were identified")
+
+        
+with tab8:
+
+    st.write(" If your protein data is not Uniprot annotated, please run this first")
+    unannoteted_protein_level_upload = st.file_uploader("Unannotated Protein Level Input")
+
+    if unannoteted_protein_level_upload is not None:
+        #protein_level_upload = load_data(protein_level_upload)
+        vis.load_protein_data(unannoteted_protein_level_upload) # type: ignore
+
+        # Display a spinner with a message while get_uniprot_info is running
+        with st.spinner("Annotating proteins... Please wait."):
+            vis.get_uniprot_info()
+            annotated_protein_data = vis.merge_uniprot2proteome(vis.protein_data)
+
+        st.dataframe(annotated_protein_data)
+
+        protein_annotated_data_download = annotated_protein_data.to_csv(sep='\t', index=False)
+
+        st.download_button(
+            label="Download data as TSV",
+            data=protein_annotated_data_download,
+            file_name='protein_level_annotated.txt',
+            mime='text/csv',
+            help="Click to download the current data as a TSV/TXT file"
+        )
+
+                
+
 
 
                 
