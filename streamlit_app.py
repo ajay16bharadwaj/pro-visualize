@@ -409,6 +409,9 @@ with tab6:
 
 
     with venn_tab2:
+
+        st.write("sankey plot")
+        """ 
         if analysis_status:
             
             df = vis.dep_info.copy()
@@ -432,6 +435,7 @@ with tab6:
 
             # Use st.image to display the image with a specified width.
             st.image(img_bytes, caption='Venn Diagram', use_column_width=False, width=600)
+        """
 
 
 with tab7:
