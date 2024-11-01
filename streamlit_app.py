@@ -164,7 +164,7 @@ with tab1:
         condition_groups = vis.volcano_preprocess(COL_DEPLABEL) # type: ignore
         volcano_log2fc_threshold = st.slider('Log2 Fold Change Threshold', 0.0, volcano_info['log2FC'].max(), value=0.6, key='volcano_fc') # type: ignore
         volcano_fdr_threshold = st.slider('Imputed FDR Threshold', 0.0, 1.0, 0.05, key='volcano_fdr')
-        volcano_comparison_input = st.selectbox('Which comparison', condition_groups, index=1, key="volcano_comparison_input" )   
+        volcano_comparison_input = st.selectbox('Which comparison', condition_groups, index=0, key="volcano_comparison_input" )   
         #st.dataframe(condition_groups[volcano_comparison_input])     
         fig = vis.plot_volcano(condition_groups[volcano_comparison_input], volcano_log2fc_threshold, volcano_fdr_threshold)
         st.plotly_chart(fig, theme="streamlit", use_container_width=True)
@@ -183,7 +183,7 @@ with tab2:
             heatmap_condition_groups = vis.volcano_preprocess(COL_DEPLABEL) # type: ignore
             heatmap_log2fc_threshold = st.slider('Log2 Fold Change Threshold', 0.0, heatmap_info['log2FC'].max(), value=0.6, key='heatmap_fc') # type: ignore
             heatmap_fdr_threshold = st.slider('Imputed FDR Threshold', 0.0, 1.0, 0.05, key='heatmap_fdr')
-            heatmap_comparison_input = st.selectbox('Which comparison', heatmap_condition_groups, index=1, key="heatmap_comparison_input" )
+            heatmap_comparison_input = st.selectbox('Which comparison', heatmap_condition_groups, index=0, key="heatmap_comparison_input" )
 
             #getting the top 10 differentially expressed proteins and plotting that 
             df = heatmap_condition_groups[heatmap_comparison_input]
@@ -198,7 +198,8 @@ with tab2:
             custom_row_select = st.checkbox(' Choose custom entries ', key='heatmap_custom_select')
 
             if custom_row_select:
-                selection = dataframe_with_selections(df, "heatmap_custom_df_select")
+                subset_df = df[['Protein', 'log2FC', 'FDR', 'Imputed.FDR', 'Gene Name', 'Protein Description']]
+                selection = dataframe_with_selections(subset_df, "heatmap_custom_df_select")
                 with st.expander("Your selection"):
                     st.write(selection)
 
@@ -234,7 +235,7 @@ with tab3:
         violin_condition_groups = vis.volcano_preprocess(COL_DEPLABEL) # type: ignore
         violin_log2fc_threshold = st.slider('Log2 Fold Change Threshold', 0.0, violin_info['log2FC'].max(), value=0.6, key='violin_fc') # type: ignore
         violin_fdr_threshold = st.slider('Imputed FDR Threshold', 0.0, 1.0, 0.05, key='violin_fdr')
-        violin_comparison_input = st.selectbox('Which comparison', violin_condition_groups, index=1, key="violin_comparison_input" )
+        violin_comparison_input = st.selectbox('Which comparison', violin_condition_groups, index=0, key="violin_comparison_input" )
 
         #getting the top 10 differentially expressed proteins and plotting that 
         df = violin_condition_groups[violin_comparison_input]
@@ -442,7 +443,7 @@ with tab7:
         anaysis_condition_groups = vis.volcano_preprocess(COL_DEPLABEL) # type: ignore
         analysis_log2fc_threshold = st.slider('Log2 Fold Change Threshold', 0.0, df['log2FC'].max(), value=0.6, key='analysis_fc') # type: ignore
         analysis_fdr_threshold = st.slider('Imputed FDR Threshold', 0.0, 1.0, 0.05, key='analysis_fdr')
-        analysis_comparison_input = st.selectbox('Which comparison', anaysis_condition_groups, index=1, key="analysis_comparison_input" )
+        analysis_comparison_input = st.selectbox('Which comparison', anaysis_condition_groups, index=0, key="analysis_comparison_input" )
         organism_input = st.selectbox(' Choose your organism', list(vis.organism_dict.keys()), index=0, key="organism_input")
 
         #choosing comparison based filtered df
