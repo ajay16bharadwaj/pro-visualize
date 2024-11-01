@@ -162,7 +162,7 @@ class ProteinVisualization:
             hover_data=['SampleName'],
             title=f'PCA Plot - Colored by {group_column}',
             labels={group_column: 'Groups'},
-            text='SampleName',
+            #text='SampleName',
             color_discrete_map={'Northstar': 'blue', 'Vital': 'green', 'Individual': 'red'}
         )
     
