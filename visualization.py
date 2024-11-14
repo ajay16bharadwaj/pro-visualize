@@ -225,7 +225,8 @@ class ProteinVisualization:
         # Initialize plot
         fig = go.Figure()
     
-        colors = ['#FF6347', '#4682B4', '#32CD32']  # Define colors for clusters
+        colors = ['#FF6347', '#4682B4', '#32CD32', '#FFD700', '#DA70D6', '#87CEFA']  # Add as many colors as needed
+  # Define colors for clusters
     
         for cluster in range(self.n_clusters): # type: ignore
             # Filter points of the current cluster
