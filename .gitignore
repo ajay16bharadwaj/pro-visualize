@@ -129,6 +129,7 @@ ENV/
 env.bak/
 venv.bak/
 auto_report/
+auto_report_venv/
 notebooks/
 
 #vscode settings
