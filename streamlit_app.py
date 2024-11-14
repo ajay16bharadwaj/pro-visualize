@@ -570,7 +570,7 @@ with tab7:
                 kegg_col1, kegg_col2 = st.columns([0.7, 0.3])
                 if not enrichment_df.empty and source_dict is not None:
                     #kegg_df = vis.get_go_enrichment(list(dep_list_df['Protein']), go_category="GO:kegg", organism=organism_input)
-                    print("source_dict: ", source_dict.keys())
+                    #print("source_dict: ", source_dict.keys())
                     if "KEGG" in list(source_dict.keys()):
                         kegg_df = source_dict['KEGG']
 
