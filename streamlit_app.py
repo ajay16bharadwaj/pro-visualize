@@ -198,7 +198,7 @@ with tab2:
             custom_row_select = st.checkbox(' Choose custom entries ', key='heatmap_custom_select')
 
             if custom_row_select:
-                subset_df = df[['Protein', 'log2FC', 'FDR', 'Imputed.FDR', 'Gene Name', 'Protein Description']]
+                #subset_df = df[['Protein', 'log2FC', 'FDR', 'Imputed.FDR', 'Gene Name', 'Protein Description']]
                 selection = dataframe_with_selections(subset_df, "heatmap_custom_df_select")
                 with st.expander("Your selection"):
                     st.write(selection)
@@ -250,7 +250,8 @@ with tab3:
         custom_row_select = st.checkbox(' Choose custom entries ', key='violin_custom_select')
 
         if custom_row_select:
-            selection = dataframe_with_selections(df, "violin_custom_df_select")
+            #subset_df = df[['Protein', 'log2FC', 'FDR', 'Imputed.FDR', 'Gene Name', 'Protein Description']]
+            selection = dataframe_with_selections(subset_df, "violin_custom_df_select")
             with st.expander("Your selection"):
                 st.write(selection)
 
@@ -498,6 +499,36 @@ with tab7:
                                 # Default plot with the top 10 GO terms.
                                 fig_cc, ax_cc = vis.plot_go_dotplot(cc_df.sort_values(by='q_value').head(10), category_name="Cellular Component")
                                 st.pyplot(fig_cc)
+
+                        #protein information for go term
+                        st.write("Select the terms to view the proteins associated")
+                        cc_subset_for_selection = cc_df[['native', 'name', 'p_value', 'q_value', 'precision', 'recall','intersections']]
+                        cc_selected_terms_for_proteins = dataframe_with_selections(cc_subset_for_selection, "go_cc_protein_select")
+                        # Display the list of proteins associated with this term
+                        # if not cc_selected_terms_for_proteins.empty:
+                        #     st.subheader("Proteins Associated with Selected Term")
+                        #     protein_list = cc_selected_terms_for_proteins['intersections'].values[0]  # Access the list of proteins
+                        #     protein_df = pd.DataFrame(protein_list, columns=['Protein IDs'])
+                        #     st.dataframe(protein_df)
+
+                        if not cc_selected_terms_for_proteins.empty:
+                            st.subheader("Proteins Associated with Selected Terms")
+                            
+                            # Prepare data for column-by-column display
+                            proteins_dict = {}
+                            for _, row in cc_selected_terms_for_proteins.iterrows():
+                                term_name = row['name']  # Term name
+                                protein_list = row['intersections']  # List of proteins
+                                
+                                # Add to dictionary, term name as key, and protein list as value
+                                proteins_dict[term_name] = protein_list
+                            
+                            # Create a DataFrame with proteins column by column
+                            max_length = max(len(proteins) for proteins in proteins_dict.values())  # Get the maximum protein list length
+                            proteins_df = pd.DataFrame({term: pd.Series(proteins) for term, proteins in proteins_dict.items()}, index=range(max_length))
+                            
+                            # Display the resulting DataFrame
+                            st.dataframe(proteins_df)
                 else:
                     st.warning('No Cellular Componenets were found enriched for this comparison')
                         
@@ -530,6 +561,35 @@ with tab7:
                                     # Default plot with the top 10 GO terms.
                                     fig_mf, ax_mf = vis.plot_go_dotplot(mf_df.sort_values(by='q_value').head(10), category_name="Cellular Component")
                                     st.pyplot(fig_mf)
+                            
+                            st.write("Select the terms to view the proteins associated")
+                            mf_subset_for_selection = mf_df[['native', 'name', 'p_value', 'q_value', 'precision', 'recall','intersections']]
+                            mf_selected_terms_for_proteins = dataframe_with_selections(mf_subset_for_selection, "go_mf_protein_select")
+                            # Display the list of proteins associated with this term
+                            # if not cc_selected_terms_for_proteins.empty:
+                            #     st.subheader("Proteins Associated with Selected Term")
+                            #     protein_list = cc_selected_terms_for_proteins['intersections'].values[0]  # Access the list of proteins
+                            #     protein_df = pd.DataFrame(protein_list, columns=['Protein IDs'])
+                            #     st.dataframe(protein_df)
+
+                            if not mf_selected_terms_for_proteins.empty:
+                                st.subheader("Proteins Associated with Selected Terms")
+                                
+                                # Prepare data for column-by-column display
+                                proteins_dict = {}
+                                for _, row in mf_selected_terms_for_proteins.iterrows():
+                                    term_name = row['name']  # Term name
+                                    protein_list = row['intersections']  # List of proteins
+                                    
+                                    # Add to dictionary, term name as key, and protein list as value
+                                    proteins_dict[term_name] = protein_list
+                                
+                                # Create a DataFrame with proteins column by column
+                                max_length = max(len(proteins) for proteins in proteins_dict.values())  # Get the maximum protein list length
+                                proteins_df = pd.DataFrame({term: pd.Series(proteins) for term, proteins in proteins_dict.items()}, index=range(max_length))
+                                
+                                # Display the resulting DataFrame
+                                st.dataframe(proteins_df)
                     else:
                         st.warning("No Molecular Functions were found enriched with these set of Differentially Expressed Proteins")
 

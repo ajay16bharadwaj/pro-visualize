@@ -1216,7 +1216,8 @@ class ProteinVisualization:
         results = gp.profile(
             organism=gprofiler_organism,
             query=protein_list,
-            sources=None  # None means querying all sources supported by g:Profiler.
+            sources=None,  # None means querying all sources supported by g:Profiler.
+            no_evidences=False
         )
 
         results_df = pd.DataFrame(results)
@@ -1233,6 +1234,7 @@ class ProteinVisualization:
             'p_value',              # Raw p-value.
             'significant',          # Significance status (True/False).
             'intersection_size',    # Number of proteins associated with the term.
+            'intersections',        # All the proteins that are associated with the term
             'term_size',            # Total number of entities in the term in the database.
             'precision',            # Proportion of proteins in the input that are annotated with the term.
             'recall',               # Proportion of the term that is represented in the input.
