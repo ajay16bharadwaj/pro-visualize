@@ -622,6 +622,35 @@ with tab7:
                                     # Default plot with the top 10 GO terms.
                                     fig_bp, ax_bp = vis.plot_go_dotplot(bp_df.sort_values(by='q_value').head(10), category_name="Cellular Component")
                                     st.pyplot(fig_bp)
+
+                            st.write("Select the terms to view the proteins associated")
+                            bp_subset_for_selection = bp_df[['native', 'name', 'p_value', 'q_value', 'precision', 'recall','intersections']]
+                            bp_selected_terms_for_proteins = dataframe_with_selections(bp_subset_for_selection, "go_bp_protein_select")
+                            # Display the list of proteins associated with this term
+                            # if not cc_selected_terms_for_proteins.empty:
+                            #     st.subheader("Proteins Associated with Selected Term")
+                            #     protein_list = cc_selected_terms_for_proteins['intersections'].values[0]  # Access the list of proteins
+                            #     protein_df = pd.DataFrame(protein_list, columns=['Protein IDs'])
+                            #     st.dataframe(protein_df)
+
+                            if not bp_selected_terms_for_proteins.empty:
+                                st.subheader("Proteins Associated with Selected Terms")
+                                
+                                # Prepare data for column-by-column display
+                                proteins_dict = {}
+                                for _, row in bp_selected_terms_for_proteins.iterrows():
+                                    term_name = row['name']  # Term name
+                                    protein_list = row['intersections']  # List of proteins
+                                    
+                                    # Add to dictionary, term name as key, and protein list as value
+                                    proteins_dict[term_name] = protein_list
+                                
+                                # Create a DataFrame with proteins column by column
+                                max_length = max(len(proteins) for proteins in proteins_dict.values())  # Get the maximum protein list length
+                                proteins_df = pd.DataFrame({term: pd.Series(proteins) for term, proteins in proteins_dict.items()}, index=range(max_length))
+                                
+                                # Display the resulting DataFrame
+                                st.dataframe(proteins_df)
                     else: 
                         st.warning("No Biological Processes were found enriched in GO for these set of Proteins selected")
 
@@ -657,6 +686,35 @@ with tab7:
                                     # Default plot with the top 10 GO terms.
                                     fig_kegg, ax_kegg = vis.plot_go_dotplot(kegg_df.sort_values(by='q_value').head(10), category_name="Cellular Component")
                                     st.pyplot(fig_kegg)
+
+                            st.write("Select the terms to view the proteins associated")
+                            kegg_subset_for_selection = kegg_df[['native', 'name', 'p_value', 'q_value', 'precision', 'recall','intersections']]
+                            kegg_selected_terms_for_proteins = dataframe_with_selections(kegg_subset_for_selection, "go_kegg_protein_select")
+                            # Display the list of proteins associated with this term
+                            # if not cc_selected_terms_for_proteins.empty:
+                            #     st.subheader("Proteins Associated with Selected Term")
+                            #     protein_list = cc_selected_terms_for_proteins['intersections'].values[0]  # Access the list of proteins
+                            #     protein_df = pd.DataFrame(protein_list, columns=['Protein IDs'])
+                            #     st.dataframe(protein_df)
+
+                            if not kegg_selected_terms_for_proteins.empty:
+                                st.subheader("Proteins Associated with Selected Terms")
+                                
+                                # Prepare data for column-by-column display
+                                proteins_dict = {}
+                                for _, row in kegg_selected_terms_for_proteins.iterrows():
+                                    term_name = row['name']  # Term name
+                                    protein_list = row['intersections']  # List of proteins
+                                    
+                                    # Add to dictionary, term name as key, and protein list as value
+                                    proteins_dict[term_name] = protein_list
+                                
+                                # Create a DataFrame with proteins column by column
+                                max_length = max(len(proteins) for proteins in proteins_dict.values())  # Get the maximum protein list length
+                                proteins_df = pd.DataFrame({term: pd.Series(proteins) for term, proteins in proteins_dict.items()}, index=range(max_length))
+                                
+                                # Display the resulting DataFrame
+                                st.dataframe(proteins_df)
                     else:
                         st.warning("No KEGG pathways were enriched for this set of Differentially Expressed proteins")
                 else:
