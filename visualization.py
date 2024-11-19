@@ -1269,7 +1269,7 @@ class ProteinVisualization:
             category_name (str): The name of the analysis category to display in the plot title.
 
         Returns:
-            fig: A Plotly figure object containing the Manhattan-like plot.
+            fig: A Plotly figure object containing the finalized Manhattan-like plot.
         """
         # Add a column for -log10(p_value) for better visualization.
         gprofiler_results['-log10(p_value)'] = -np.log10(gprofiler_results['p_value'])
@@ -1277,11 +1277,11 @@ class ProteinVisualization:
         # Ensure 'source' and 'native' columns are treated as strings before concatenation.
         gprofiler_results['term_id'] = gprofiler_results['source'].astype(str) + ":" + gprofiler_results['native'].astype(str)
 
-        # Define categorical ordering for sources to ensure correct grouping.
+        # Define categorical ordering for sources.
         source_order = ['GO:MF', 'GO:BP', 'GO:CC', 'KEGG', 'REAC', 'WP', 'MIRNA', 'TF']
         gprofiler_results['source'] = pd.Categorical(gprofiler_results['source'], categories=source_order, ordered=True)
 
-        # Create a new column that assigns a sequential position for each term based on its source.
+        # Assign sequential positions for terms.
         gprofiler_results['x_position'] = gprofiler_results.groupby('source').cumcount() + 1
         gprofiler_results['x_position'] = gprofiler_results['source'].astype(str) + ":" + gprofiler_results['x_position'].astype(str)
 
@@ -1295,21 +1295,34 @@ class ProteinVisualization:
             hover_data=['name', 'p_value', 'q_value', 'intersection_size'],
             labels={'x_position': 'Enrichment Terms by Source', '-log10(p_value)': '-log10(p-value)'},
             title=f"Manhattan-like Plot for {category_name}",
-            category_orders={'source': source_order}
+            category_orders={'source': source_order},
+            color_discrete_sequence=px.colors.qualitative.Set2  # Better color contrast
         )
 
-        # Customize layout for better readability.
+        # Refine layout.
         fig.update_layout(
-            xaxis_title='Enrichment Terms by Source',
-            yaxis_title='-log10(p-value)',
-            showlegend=True,
-            template='plotly_white',
+            xaxis=dict(
+                title=dict(
+                    text="Enrichment Terms by Source",
+                    standoff=10  # Add space between the title and the plot
+                ),
+                showticklabels=False  # Hide tick labels
+            ),
+            yaxis=dict(title='-log10(p-value)'),
+            legend=dict(
+                x=1.02,
+                y=1,
+                title="Source",
+                bgcolor="rgba(255,255,255,0)",
+                bordercolor="rgba(0,0,0,0)"
+            ),
+            margin=dict(l=50, r=200, t=70, b=50),
             height=600,
-            width=1000,
-            xaxis=dict(showticklabels=False)  # Hide detailed x-tick labels.
+            width=1200,
+            template='plotly_white'
         )
 
-        # Add shaded regions for each source category.
+        # Add subtle shaded regions for each source category.
         start_idx = 0
         for source in source_order:
             source_data = gprofiler_results[gprofiler_results['source'] == source]
@@ -1319,27 +1332,29 @@ class ProteinVisualization:
                     type='rect',
                     x0=start_idx, x1=end_idx,
                     y0=0, y1=gprofiler_results['-log10(p_value)'].max(),
-                    fillcolor=px.colors.qualitative.Plotly[source_order.index(source) % len(px.colors.qualitative.Plotly)],
-                    opacity=0.2,
+                    fillcolor=px.colors.qualitative.Set2[source_order.index(source) % len(px.colors.qualitative.Set2)],
+                    opacity=0.1,  # Subtle shading
                     line_width=0
                 )
-
-                # Adjust label position for smaller categories like REAC and MIRNA.
-                offset = 0.5 if len(source_data) < 5 else 0
                 fig.add_annotation(
-                    x=(start_idx + end_idx) / 2 + offset,
-                    y=-0.5,  # Position below the x-axis.
+                    x=(start_idx + end_idx) / 2,
+                    y=-1,  # Position below the x-axis
                     text=source,
                     showarrow=False,
                     font=dict(size=12, color="black"),
                     xanchor="center",
-                    yanchor="top"  # Align text above the annotation point.
+                    yanchor="top"
                 )
-
                 start_idx = end_idx
 
-        # Adjust marker size range for better visual separation.
-        fig.update_traces(marker=dict(sizemode='area', sizeref=2.*max(gprofiler_results['intersection_size'])/(100**2), sizemin=4))
+        # Adjust circle size scaling for better separation.
+        fig.update_traces(
+            marker=dict(
+                sizemode='area',
+                sizeref=2. * max(gprofiler_results['intersection_size']) / (50 ** 2),  # Reduce circle size scaling
+                sizemin=4
+            )
+        )
 
         return fig
     
