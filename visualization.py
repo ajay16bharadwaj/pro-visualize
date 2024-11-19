@@ -1189,13 +1189,13 @@ class ProteinVisualization:
         
         return fig, ax
     
-    def get_all_enrichment(self, protein_list, organism="human"):
+    def get_all_enrichment(self, genes_list, organism="human"):
         """
-        Perform comprehensive enrichment analysis for a list of proteins using g:Profiler
+        Perform comprehensive enrichment analysis for a list of genes using g:Profiler
         and split the results into a dictionary of DataFrames based on enrichment sources.
 
         Args:
-            protein_list (list): List of protein identifiers (e.g., UniProt IDs).
+            genes (list): List of protein identifiers (e.g., ["TP53", "BRCA1", "MYC", "EGFR", "AKT1"]).
             organism (str): Organism name (e.g., 'human', 'mouse', 'rat'). Uses organism_dict for conversion.
 
         Returns:
@@ -1209,13 +1209,18 @@ class ProteinVisualization:
         
         gprofiler_organism = self.organism_dict[organism.lower()]
 
+        # Clean the input list
+        clean_gene_list = [gene for gene in genes_list if isinstance(gene, str) and gene.strip()]
+        if not clean_gene_list:
+            raise ValueError("Input list is empty or contains invalid values (e.g., NaN, None). Please provide valid gene names.")
+
         # Initialize g:Profiler.
         gp = GProfiler()
         
         # Run enrichment analysis for all available sources.
         results = gp.profile(
             organism=gprofiler_organism,
-            query=protein_list,
+            query=clean_gene_list,
             sources=None,  # None means querying all sources supported by g:Profiler.
             no_evidences=False
         )

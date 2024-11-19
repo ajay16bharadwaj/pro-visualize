@@ -14,6 +14,7 @@ from visualization import ProteinVisualization
 #################
 COL_DEPLABEL = 'Label2'
 COL_DEPSIGNIF = 'Imputed.FDR'
+GENE_NAME_COLUMN = 'Gene Name'
 color_map = {
         'Down-regulated': '#0072B2',
         'Significant, no change': '#F0E442',
@@ -464,7 +465,7 @@ with tab7:
         ea, go_cc, go_mf, go_bp, kegg = st.tabs(['Comprehensive Enrichment Analysis','GO Cellular Component Encrichment', 'GO Molecular Function', 'GO Biological Process', 'KEGG Biological Pathways'])
 
         with ea:
-            enrichment_df, source_dict =  cached_get_all_enrichment(vis, list(dep_list_df['Protein']), organism_input)
+            enrichment_df, source_dict =  cached_get_all_enrichment(vis, list(dep_list_df[GENE_NAME_COLUMN]), organism_input)
             ea_manhattan_plot = vis.plot_manhattan(enrichment_df, category_name="Comprehensive Enrichment Analysis")
             st.plotly_chart(ea_manhattan_plot)
 
@@ -500,7 +501,7 @@ with tab7:
                                 st.pyplot(fig_cc)
 
                         #protein information for go term
-                        st.write("Select the terms to view the proteins associated")
+                        st.write("Select the terms to view the Genes associated")
                         cc_subset_for_selection = cc_df[['native', 'name', 'p_value', 'q_value', 'precision', 'recall','intersections']]
                         cc_selected_terms_for_proteins = dataframe_with_selections(cc_subset_for_selection, "go_cc_protein_select")
                         # Display the list of proteins associated with this term
@@ -511,7 +512,7 @@ with tab7:
                         #     st.dataframe(protein_df)
 
                         if not cc_selected_terms_for_proteins.empty:
-                            st.subheader("Proteins Associated with Selected Terms")
+                            st.subheader("Genes Associated with Selected Terms")
                             
                             # Prepare data for column-by-column display
                             proteins_dict = {}
@@ -561,7 +562,7 @@ with tab7:
                                     fig_mf, ax_mf = vis.plot_go_dotplot(mf_df.sort_values(by='q_value').head(10), category_name="Cellular Component")
                                     st.pyplot(fig_mf)
                             
-                            st.write("Select the terms to view the proteins associated")
+                            st.write("Select the terms to view the Genes associated")
                             mf_subset_for_selection = mf_df[['native', 'name', 'p_value', 'q_value', 'precision', 'recall','intersections']]
                             mf_selected_terms_for_proteins = dataframe_with_selections(mf_subset_for_selection, "go_mf_protein_select")
                             # Display the list of proteins associated with this term
@@ -572,7 +573,7 @@ with tab7:
                             #     st.dataframe(protein_df)
 
                             if not mf_selected_terms_for_proteins.empty:
-                                st.subheader("Proteins Associated with Selected Terms")
+                                st.subheader("Genes Associated with Selected Terms")
                                 
                                 # Prepare data for column-by-column display
                                 proteins_dict = {}
@@ -622,7 +623,7 @@ with tab7:
                                     fig_bp, ax_bp = vis.plot_go_dotplot(bp_df.sort_values(by='q_value').head(10), category_name="Cellular Component")
                                     st.pyplot(fig_bp)
 
-                            st.write("Select the terms to view the proteins associated")
+                            st.write("Select the terms to view the Genes associated")
                             bp_subset_for_selection = bp_df[['native', 'name', 'p_value', 'q_value', 'precision', 'recall','intersections']]
                             bp_selected_terms_for_proteins = dataframe_with_selections(bp_subset_for_selection, "go_bp_protein_select")
                             # Display the list of proteins associated with this term
@@ -633,7 +634,7 @@ with tab7:
                             #     st.dataframe(protein_df)
 
                             if not bp_selected_terms_for_proteins.empty:
-                                st.subheader("Proteins Associated with Selected Terms")
+                                st.subheader("Genes Associated with Selected Terms")
                                 
                                 # Prepare data for column-by-column display
                                 proteins_dict = {}
@@ -686,7 +687,7 @@ with tab7:
                                     fig_kegg, ax_kegg = vis.plot_go_dotplot(kegg_df.sort_values(by='q_value').head(10), category_name="Cellular Component")
                                     st.pyplot(fig_kegg)
 
-                            st.write("Select the terms to view the proteins associated")
+                            st.write("Select the terms to view the Genes associated")
                             kegg_subset_for_selection = kegg_df[['native', 'name', 'p_value', 'q_value', 'precision', 'recall','intersections']]
                             kegg_selected_terms_for_proteins = dataframe_with_selections(kegg_subset_for_selection, "go_kegg_protein_select")
                             # Display the list of proteins associated with this term
@@ -697,7 +698,7 @@ with tab7:
                             #     st.dataframe(protein_df)
 
                             if not kegg_selected_terms_for_proteins.empty:
-                                st.subheader("Proteins Associated with Selected Terms")
+                                st.subheader("Genes Associated with Selected Terms")
                                 
                                 # Prepare data for column-by-column display
                                 proteins_dict = {}
