@@ -157,7 +157,7 @@ with st.container():
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(["Volcano Plot", "Heat Maps", "Violin Plot", "Quantification", "Clustering", "Venn Diagram", "Functional Analysis and Biological Annotations", "Get Uniprot annotations"])
 
 #volcano plot - to set interactive FDR and FC thresholds
-with tab1:
+with tab1:    
     if analysis_status and annotation_file_upload:
         #st.write('this tab will be used for volcano plot')
         volcano_info = vis.dep_info.copy() # type: ignore
@@ -168,8 +168,7 @@ with tab1:
         #st.dataframe(condition_groups[volcano_comparison_input])     
         fig = vis.plot_volcano(condition_groups[volcano_comparison_input], volcano_log2fc_threshold, volcano_fdr_threshold)
         st.plotly_chart(fig, theme="streamlit", use_container_width=True)
-        figures_dict["Volcano Plot"] = fig
-        
+        figures_dict["Volcano Plot"] = fig    
 
 #heatmaps
 #default to top 10 DEP, and options FDR and FC values. Give the option to select custom proteins as well. 
