@@ -1,3 +1,4 @@
+from multiprocessing.managers import ValueProxy
 import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
@@ -10,6 +11,11 @@ import matplotlib.pyplot as plt
 import re
 from compute_functions import *
 import dash_bio
+import requests
+from requests.adapters import HTTPAdapter, Retry
+from venn import venn
+from gprofiler import GProfiler
+import seaborn as sns
 
 class ProteinVisualization:
 
@@ -22,10 +28,25 @@ class ProteinVisualization:
             'Non-significant': '#999999'
         }
     
+    organism_dict = {
+    "human": "hsapiens",
+    "mouse": "mmusculus",
+    "rat": "rnorvegicus",
+    "zebrafish": "drerio",
+    "fruit fly": "dmelanogaster",
+    "worm": "celegans",
+    "yeast": "scerevisiae",
+    "arabidopsis": "athaliana",
+    "pig": "sscrofa",
+    "cow": "btaurus",
+    "chicken": "ggallus"
+}
+    
     def __init__(self):
         self.protein_data = None
         self.annotation_info = None
         self.dep_info = None
+        self.protein_data_annotated = None
         self.uniprot_info = None
         self.protein_data_for_pca = None
         self.analysis_with_annotation = None
@@ -74,13 +95,17 @@ class ProteinVisualization:
             raise ValueError(f"No missing values allowed in the annotation file.")
         
         return annotation_info, LIMIT_SAMPLE_COMPARISONS
+                
 
     def preprocess_for_pca(self):
         """Preprocess protein data specifically for PCA or other plots that require normalization."""
         df = self.protein_data.copy()
         df.replace([np.inf, -np.inf], np.nan, inplace=True)
         df.fillna(0, inplace=True)
-        self.protein_data_for_pca = df.set_index('Protein')
+        #keep only Protein information for all the samples: 
+        sample_columns = list(self.annotation_info.SampleName.unique())
+        filtered_df = df[['Protein'] + [col for col in sample_columns if col in df.columns]]
+        self.protein_data_for_pca = filtered_df.set_index('Protein')
         return self.protein_data_for_pca 
 
     def preprocess_for_heatmaps(self):
@@ -137,7 +162,7 @@ class ProteinVisualization:
             hover_data=['SampleName'],
             title=f'PCA Plot - Colored by {group_column}',
             labels={group_column: 'Groups'},
-            text='SampleName',
+            #text='SampleName',
             color_discrete_map={'Northstar': 'blue', 'Vital': 'green', 'Individual': 'red'}
         )
     
@@ -200,7 +225,8 @@ class ProteinVisualization:
         # Initialize plot
         fig = go.Figure()
     
-        colors = ['#FF6347', '#4682B4', '#32CD32']  # Define colors for clusters
+        colors = ['#FF6347', '#4682B4', '#32CD32', '#FFD700', '#DA70D6', '#87CEFA']  # Add as many colors as needed
+  # Define colors for clusters
     
         for cluster in range(self.n_clusters): # type: ignore
             # Filter points of the current cluster
@@ -313,7 +339,7 @@ class ProteinVisualization:
         """Fetch UniProt information for the proteins in the dataset."""
         if self.uniprot_info is None:
            
-            proteins =   list(set(self.dep_info['Protein'].tolist()))# type: ignore # Get unique proteins from the index
+            proteins =   list(set(self.protein_data['Protein'].tolist()))# type: ignore # Get unique proteins from the index
             protein_names = []
 
             # Remove fasta descriptions if present and get UniProt IDs
@@ -395,18 +421,29 @@ class ProteinVisualization:
             print("Couldn't fetch UniProt Annotation at the moment.")
             return pd.DataFrame()
 
-    def merge_uniprot2proteome(self):
+    def merge_uniprot2proteome(self, df):
         """Merge DEP data with UniProt information."""
         if self.uniprot_info is None:
             raise ValueError("UniProt information is not loaded.")
-        self.dep_info['ProteinIds'] = self.dep_info['Protein'].apply(self._get_uniprot_ids)
-        merged_df = pd.merge(self.uniprot_info, self.dep_info, on="ProteinIds", how="right")
-        self.analysis_with_annotation = merged_df
+        df['ProteinIds'] = df['Protein'].apply(self._get_uniprot_ids)
+        merged_df = pd.merge(self.uniprot_info, df, on="ProteinIds", how="right")
+        return merged_df
+    
+    def merge_dep_ptlevel(self, dep_df, pt_level):
+        df2_selected = pt_level[['Protein', 'Gene Name', 'Protein Description']]
+        merged_df = pd.merge(dep_df, df2_selected, on="Protein", how="left")
+        return merged_df
 
     def volcano_preprocess(self, COL_DEPLABEL):
         """Preprocess for volcano plot by grouping based on DEP label."""
-        if self.analysis_with_annotation is None:
+        if self.dep_info is None:
             raise ValueError("DEP information is not loaded or Uniprot Annotation is non existant")
+        
+        if self.protein_data_annotated is None:
+            raise ValueError("Protein Data is not annotated, please upload annotated protein information")
+        
+        if self.analysis_with_annotation is None:        
+            self.analysis_with_annotation = self.merge_dep_ptlevel(self.dep_info, self.protein_data_annotated)
         
         condition_level = sorted(self.analysis_with_annotation[COL_DEPLABEL].unique())
         self.analysis_with_annotation[COL_DEPLABEL] = pd.Categorical(self.analysis_with_annotation[COL_DEPLABEL], categories=condition_level, ordered=True)
@@ -415,6 +452,11 @@ class ProteinVisualization:
     
     def plot_volcano(self, df, FC, p_val):
         """Generate volcano plot."""
+        if self.protein_data_annotated is None: 
+            raise ValueError("Annotated Protein data is required to display Gene and Protein Description information")
+        
+    
+
         df['sig'] = -np.log10(df[self.COL_DEPSIGNIF])
 
         df['label'] = 'Non-significant'
@@ -425,7 +467,20 @@ class ProteinVisualization:
         fig = px.scatter(df, x='log2FC', y='sig', color='label', color_discrete_map=self.color_map, hover_data=['Gene Name', 'Protein Description'])
             
             # Customizing the layout
-        fig.update_layout(title=f'Volcano Plot', xaxis_title="log2 fold change", yaxis_title="-log10(FDR)", legend_title_text='Category')
+        #fig.update_layout(title=f'Volcano Plot with </b>FC = ±{FC} p-value = {p_val} ', xaxis_title="log2 fold change", yaxis_title="-log10(FDR)", legend_title_text='Category')
+
+        fig.update_layout(
+            title={
+                'text': f"Volcano Plot<br><sup>FC = ±{FC} | p-value = {p_val}</sup>",
+                'x': 0.5,
+                'y': 0.95,
+                'xanchor': 'center',
+                'yanchor': 'top'
+            },
+            xaxis_title="log2 fold change",
+            yaxis_title="-log10(FDR)",
+            legend_title_text='Category'
+        )
             
             # Adding horizontal and vertical lines for cutoffs
         fig.add_shape(type="line", x0=-FC, y0=0, x1=-FC, y1=df['sig'].max(), line=dict(color="RoyalBlue", width=2, dash="dot"))
@@ -554,8 +609,16 @@ class ProteinVisualization:
         if isinstance(protein_list, str):
             protein_list = [protein_list]
         
+        df = self.protein_data.copy()
         # Filter protein data for the specified proteins
-        df_filtered = self.protein_data[self.protein_data['Protein'].isin(protein_list)]
+        #ensure only sample columns are present. 
+        sample_columns = list(self.annotation_info.SampleName.unique())
+        filtered_df = df[['Protein'] + [col for col in sample_columns if col in df.columns]]
+
+
+        #need to set the index and scale it before plotting. 
+
+        df_filtered = filtered_df[filtered_df['Protein'].isin(protein_list)]
         if df_filtered.empty:
             raise ValueError("None of the specified proteins were found in the protein data.")
         
@@ -654,12 +717,18 @@ class ProteinVisualization:
 
         from sklearn.preprocessing import MinMaxScaler
 
+        #ensure only numeric values from samples get passed on to the plot. 
+        # Get the list of sample names from annotation information
+        sample_columns = list(self.annotation_info.SampleName.unique())
+        filtered_df = df[['Protein'] + [col for col in sample_columns if col in df.columns]]
+
+
         #need to set the index and scale it before plotting. 
-        df = df.set_index('Protein')
+        filtered_df = filtered_df.set_index('Protein')
         #df = df.drop('Protein', axis=1)
 
         scaler = MinMaxScaler()
-        df1_norm = pd.DataFrame(scaler.fit_transform(df), columns=df.columns, index=df.index)
+        df1_norm = pd.DataFrame(scaler.fit_transform(filtered_df), columns=filtered_df.columns, index=filtered_df.index)
 
 
         fig = dash_bio.Clustergram(
@@ -681,14 +750,17 @@ class ProteinVisualization:
             raise ValueError("Protein data not loaded.")
 
         # Use the raw protein data, setting 'Protein' as the index
-        df = self.protein_data.copy().set_index('Protein')
+        df = self.protein_data.copy()
+        sample_columns = list(self.annotation_info.SampleName.unique())
+        filtered_df = df[['Protein'] + [col for col in sample_columns if col in df.columns]]
+        filtered_df = filtered_df.set_index('Protein')
 
         # Replace infinite values and fill NaNs with zeros
-        df.replace([np.inf, -np.inf], np.nan, inplace=True)
-        df.fillna(0, inplace=True)
+        filtered_df.replace([np.inf, -np.inf], np.nan, inplace=True)
+        filtered_df.fillna(0, inplace=True)
 
         # Calculate Spearman correlation
-        corr_matrix = df.corr(method='spearman')
+        corr_matrix = filtered_df.corr(method='spearman')
 
         # Create the heatmap using Plotly
         fig = go.Figure(
@@ -863,17 +935,22 @@ class ProteinVisualization:
         
         # Merge protein data with annotation info
         df = self.protein_data.copy()
-        df = pd.melt(df, id_vars=['Protein'], var_name='Sample', value_name='Intensity')
+        #ensure only sample columns are present. 
+        sample_columns = list(self.annotation_info.SampleName.unique())
+        filtered_df = df[['Protein'] + [col for col in sample_columns if col in df.columns]]
+
+
+        filtered_df = pd.melt(filtered_df, id_vars=['Protein'], var_name='Sample', value_name='Intensity')
         
         # Log transformation to make the data more normally distributed
-        df['log10(Intensity)'] = np.log10(df['Intensity'].replace(0, np.nan))
+        filtered_df['log10(Intensity)'] = np.log10(filtered_df['Intensity'].replace(0, np.nan))
         
         # Merge with annotation info to add grouping
-        df = df.merge(self.annotation_info, left_on='Sample', right_on='SampleName', how='left')
+        filtered_df = filtered_df.merge(self.annotation_info, left_on='Sample', right_on='SampleName', how='left')
         
         # Create the density plot using plotly express
         fig = px.histogram(
-            df,
+            filtered_df,
             x='log10(Intensity)',
             color='Sample',
             facet_col='Group',
@@ -899,3 +976,391 @@ class ProteinVisualization:
         fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
         
         return fig
+    
+    def plot_protein_rank_order(self, selected_proteins=[]):
+        """
+        Plot the protein rank order with options to highlight selected proteins.
+        
+        Parameters:
+        - vis: The ProteinVisualization class instance containing the data.
+        - selected_proteins: A list of proteins to highlight on the plot.
+        """
+        # Calculate the average protein intensity and log10 transform it
+        if self.protein_data is None:
+            raise ValueError("Protein data not loaded.")
+
+        # Calculate the average intensity across all samples for each protein
+        df = self.protein_data.copy()
+        sample_columns = list(self.annotation_info.SampleName.unique())
+        filtered_df = df[['Protein'] + [col for col in sample_columns if col in df.columns]]
+        filtered_df = filtered_df.set_index('Protein')
+        avg_intensity = filtered_df.mean(axis=1)
+        avg_intensity_log = np.log10(avg_intensity)
+        
+        # Create a DataFrame with protein ranks
+        rank_df = pd.DataFrame({
+            'Protein': avg_intensity_log.index,
+            'log10_intensity': avg_intensity_log.values
+        }).sort_values('log10_intensity', ascending=False).reset_index(drop=True)
+        
+        # Add rank to the DataFrame
+        rank_df['Protein Rank'] = rank_df.index + 1
+        
+        # Merge with Gene Name and Protein Description for hover information
+        rank_df = pd.merge(
+            rank_df,
+            self.protein_data_annotated[['ProteinIds', 'Gene Name', 'Protein Description']].rename(columns={'ProteinIds': 'Protein'}),
+            on='Protein',
+            how='left'
+        )
+        
+        # Determine if a protein is selected or not
+        rank_df['Selected'] = rank_df['Protein'].apply(lambda x: x in selected_proteins)
+        
+        # Create the Plotly scatter plot
+        fig = px.scatter(
+            rank_df,
+            x='Protein Rank',
+            y='log10_intensity',
+            hover_data=['Protein', 'Gene Name', 'Protein Description'],
+            color='Selected',
+            color_discrete_map={True: 'red', False: 'blue'},
+            title="Protein Rank-Order",
+            labels={'log10_intensity': 'log10 of Average Protein Intensity'}
+        )
+        
+        # Add annotations for selected proteins
+        # Loop for adding annotations with enhanced styling
+        for protein in selected_proteins:
+            protein_row = rank_df[rank_df['Protein'] == protein]
+            if not protein_row.empty:
+                x_value = protein_row['Protein Rank'].values[0]
+                y_value = protein_row['log10_intensity'].values[0]
+                fig.add_annotation(
+                    x=x_value,
+                    y=y_value,
+                    text=protein,  # Text shown near the arrow
+                    showarrow=True,
+                    arrowhead=3,  # Make arrowhead more prominent
+                    ax=30,  # Increase distance of text from the point in x-direction for better visibility
+                    ay=-40,  # Increase distance of text from the point in y-direction for a longer arrow
+                    arrowcolor="blue",  # Change arrow color to blue
+                    arrowsize=2,  # Make the arrowhead larger for better visibility
+                    arrowwidth=2.5,  # Slightly increase the arrow line width
+                    font=dict(
+                        color="blue",  # Change text color to match the arrow color
+                        size=12  # Make the font size larger for better readability
+                    )
+                )
+
+        
+        # Adjust layout
+        fig.update_layout(
+            width=800,
+            height=500,
+            xaxis_title="Protein Rank",
+            yaxis_title="log10(Average Protein Intensity)",
+            showlegend=False
+        )
+        
+        return fig
+    
+    def plot_venn(self, protein_grouped_list, figsize=(8, 6)):
+        """
+        Plot a Venn diagram for proteins across selected groups.
+            
+        Args:
+            protein_grouped_list (dict): Protein list dictionary organized by groups and list of protein sets.
+            figsize (tuple): Size of the figure in inches (width, height).
+            
+        Returns:
+            fig: Matplotlib fig containing the Venn diagram.
+        """
+        # Create the figure with the specified size.
+        fig, ax = plt.subplots(figsize=figsize)
+        venn(protein_grouped_list, ax=ax)
+        
+        return fig
+    
+    def _get_gprofiler_instance(self):
+    # Ensure that a fresh instance of GProfiler is created every time.
+        return GProfiler()
+    
+    def get_go_enrichment(self, protein_list, go_category="GO:BP", organism="human"):
+        """
+        Perform GO enrichment analysis for a list of proteins using g:Profiler.
+
+        Args:
+            protein_list (list): List of protein identifiers (e.g., UniProt IDs).
+            go_category (str): GO category to filter ('GO:BP', 'GO:MF', 'GO:CC').
+                            'GO:BP' for Biological Process, 'GO:MF' for Molecular Function,
+                            'GO:CC' for Cellular Component.
+            organism (str): Organism name (e.g., 'human', 'mouse', 'rat'). Uses organism_dict for conversion.
+
+        Returns:
+            pd.DataFrame: A DataFrame with enriched GO terms, including q-values and the number of proteins associated with each term.
+        """
+        # Convert organism name to g:Profiler's ID.
+        if organism.lower() not in self.organism_dict:
+            raise ValueError(f"Organism '{organism}' is not recognized. Available options: {list(self.organism_dict.keys())}")
+        
+        gprofiler_organism = self.organism_dict[organism.lower()]
+
+        # Initialize g:Profiler.
+        gp = self._get_gprofiler_instance()
+        
+        # Run enrichment analysis.
+        results = gp.profile(
+            organism=gprofiler_organism,
+            query=protein_list,
+            sources=[go_category]  # Filter by the specified GO category.
+        )
+
+        results_df = pd.DataFrame(results)
+
+        # Check if the results DataFrame is not empty before proceeding.
+        if results_df.empty:
+            return pd.DataFrame()  # Return an empty DataFrame if no results.
+
+        # Filter columns of interest.
+        results_filtered = results_df[[
+            'native',               # GO term ID.
+            'name',                 # GO term name.
+            'source',               # Category (BP, MF, CC).
+            'p_value',              # Raw p-value.
+            'significant',          # Significance status (True/False).
+            'intersection_size',    # Number of proteins associated with the term.
+            'term_size',            # Total number of entities in the term in the database.
+            'precision',            # Proportion of proteins in the input that are annotated with the term.
+            'recall',               # Proportion of the term that is represented in the input.
+            'query_size',           # Number of proteins in the query.
+            'effective_domain_size' # Effective domain size.
+        ]] # type: ignore
+
+        # Calculate q-values for multiple testing correction.
+        results_filtered['q_value'] = results_filtered['p_value'] * results_filtered['effective_domain_size']
+        results_filtered = results_filtered.sort_values('q_value')
+
+        return results_filtered
+    
+    def plot_go_dotplot(self, go_df, category_name, p_value_col='p_value', intersection_size_col='intersection_size', figsize=(8, 6)):
+        """
+        Plots a dot plot for GO enrichment results.
+        
+        Args:
+            go_df (pd.DataFrame): DataFrame with GO enrichment results.
+            category_name (str): Name of the GO category (e.g., 'Biological Process').
+            p_value_col (str): Column name for the p-values.
+            intersection_size_col (str): Column name for the number of proteins associated with each term.
+            figsize (tuple): Size of the figure.
+        
+        Returns:
+            fig, ax: Matplotlib figure and axis.
+        """
+        # Add a column for -log10(p_value) to make plotting easier.
+        go_df['-log10(p_value)'] = -np.log10(go_df[p_value_col])
+        
+        # Create the plot.
+        fig, ax = plt.subplots(figsize=figsize)
+        sns.scatterplot(
+            data=go_df,
+            x='-log10(p_value)',
+            y='name',  # GO term names.
+            size=intersection_size_col,
+            sizes=(40, 400),  # Adjust the range for bubble sizes.
+            hue=intersection_size_col,
+            palette='viridis',  # You can change the palette if you want.
+            alpha=0.7,
+            ax=ax
+        )
+        
+        # Add labels and title.
+        ax.set_title(f"GO Enrichment Dot Plot for {category_name}")
+        ax.set_xlabel("-log10(p-value)")
+        ax.set_ylabel("GO terms")
+        ax.grid(True, linestyle='--', linewidth=0.7, alpha=0.6)
+
+        # Adjust the legend for size.
+        handles, labels = ax.get_legend_handles_labels()
+        ax.legend(
+            handles=handles[1:], labels=labels[1:], title="Proteins",
+            bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.
+        )
+        
+        return fig, ax
+    
+    def get_all_enrichment(self, genes_list, organism="human"):
+        """
+        Perform comprehensive enrichment analysis for a list of genes using g:Profiler
+        and split the results into a dictionary of DataFrames based on enrichment sources.
+
+        Args:
+            genes (list): List of protein identifiers (e.g., ["TP53", "BRCA1", "MYC", "EGFR", "AKT1"]).
+            organism (str): Organism name (e.g., 'human', 'mouse', 'rat'). Uses organism_dict for conversion.
+
+        Returns:
+            pd.DataFrame: The complete DataFrame with all enrichment results.
+            dict: A dictionary where keys are enrichment sources (e.g., 'GO:CC', 'GO:MF', 'KEGG') and 
+                values are DataFrames containing the enrichment results for each source.
+        """
+        # Convert organism name to g:Profiler's ID.
+        if organism.lower() not in self.organism_dict:
+            raise ValueError(f"Organism '{organism}' is not recognized. Available options: {list(self.organism_dict.keys())}")
+        
+        gprofiler_organism = self.organism_dict[organism.lower()]
+
+        # Clean the input list
+        clean_gene_list = [gene for gene in genes_list if isinstance(gene, str) and gene.strip()]
+        if not clean_gene_list:
+            raise ValueError("Input list is empty or contains invalid values (e.g., NaN, None). Please provide valid gene names.")
+
+        # Initialize g:Profiler.
+        gp = GProfiler()
+        
+        # Run enrichment analysis for all available sources.
+        results = gp.profile(
+            organism=gprofiler_organism,
+            query=clean_gene_list,
+            sources=None,  # None means querying all sources supported by g:Profiler.
+            no_evidences=False
+        )
+
+        results_df = pd.DataFrame(results)
+
+        # Check if the results DataFrame is not empty before proceeding.
+        if results_df.empty:
+            return pd.DataFrame(), {}  # Return an empty DataFrame and an empty dictionary if no results.
+
+        # Filter columns of interest.
+        results_filtered = results_df[[
+            'native',               # Term ID (e.g., GO term, KEGG pathway ID).
+            'name',                 # Term name (e.g., 'cell migration', 'Ribosome').
+            'source',               # Source (e.g., 'GO:BP', 'GO:CC', 'KEGG', 'REAC').
+            'p_value',              # Raw p-value.
+            'significant',          # Significance status (True/False).
+            'intersection_size',    # Number of proteins associated with the term.
+            'intersections',        # All the proteins that are associated with the term
+            'term_size',            # Total number of entities in the term in the database.
+            'precision',            # Proportion of proteins in the input that are annotated with the term.
+            'recall',               # Proportion of the term that is represented in the input.
+            'query_size',           # Number of proteins in the query.
+            'effective_domain_size' # Effective domain size.
+        ]]
+
+        # Calculate q-values for multiple testing correction using the Benjamini-Hochberg procedure.
+        results_filtered['q_value'] = results_filtered['p_value'] * results_filtered['effective_domain_size'] / results_filtered['effective_domain_size'].max()
+        #results_filtered['q_value'] = results_filtered['q_value'].clip(upper=1.0)  # Ensure q-values don't exceed 1.
+
+        # Sort results by q_value for better prioritization.
+        results_filtered = results_filtered.sort_values('q_value')
+
+        # Split the results into separate DataFrames based on the 'source' column.
+        sources = results_filtered['source'].unique()
+        source_dict = {
+            source: results_filtered[results_filtered['source'] == source].reset_index(drop=True)
+            for source in sources
+        }
+
+        # Return the complete DataFrame and the dictionary of DataFrames.
+        return results_filtered, source_dict
+    
+    def plot_manhattan(self, gprofiler_results, category_name="Comprehensive Enrichment Analysis"):
+        """
+        Create a Manhattan-like plot using g:Profiler results, with colored blocks for each source
+        and single labels for each GO category positioned below the x-axis.
+
+        Args:
+            gprofiler_results (pd.DataFrame): DataFrame containing g:Profiler results with 'source', 'name', and 'p_value'.
+            category_name (str): The name of the analysis category to display in the plot title.
+
+        Returns:
+            fig: A Plotly figure object containing the finalized Manhattan-like plot.
+        """
+        # Add a column for -log10(p_value) for better visualization.
+        gprofiler_results['-log10(p_value)'] = -np.log10(gprofiler_results['p_value'])
+
+        # Ensure 'source' and 'native' columns are treated as strings before concatenation.
+        gprofiler_results['term_id'] = gprofiler_results['source'].astype(str) + ":" + gprofiler_results['native'].astype(str)
+
+        # Define categorical ordering for sources.
+        source_order = ['GO:MF', 'GO:BP', 'GO:CC', 'KEGG', 'REAC', 'WP', 'MIRNA', 'TF']
+        gprofiler_results['source'] = pd.Categorical(gprofiler_results['source'], categories=source_order, ordered=True)
+
+        # Assign sequential positions for terms.
+        gprofiler_results['x_position'] = gprofiler_results.groupby('source').cumcount() + 1
+        gprofiler_results['x_position'] = gprofiler_results['source'].astype(str) + ":" + gprofiler_results['x_position'].astype(str)
+
+        # Create the scatter plot.
+        fig = px.scatter(
+            gprofiler_results,
+            x='x_position',
+            y='-log10(p_value)',
+            color='source',
+            size='intersection_size',
+            hover_data=['name', 'p_value', 'q_value', 'intersection_size'],
+            labels={'x_position': 'Enrichment Terms by Source', '-log10(p_value)': '-log10(p-value)'},
+            title=f"Manhattan-like Plot for {category_name}",
+            category_orders={'source': source_order},
+            color_discrete_sequence=px.colors.qualitative.Set2  # Better color contrast
+        )
+
+        # Refine layout.
+        fig.update_layout(
+            xaxis=dict(
+                title=dict(
+                    text="Enrichment Terms by Source",
+                    standoff=10  # Add space between the title and the plot
+                ),
+                showticklabels=False  # Hide tick labels
+            ),
+            yaxis=dict(title='-log10(p-value)'),
+            legend=dict(
+                x=1.02,
+                y=1,
+                title="Source",
+                bgcolor="rgba(255,255,255,0)",
+                bordercolor="rgba(0,0,0,0)"
+            ),
+            margin=dict(l=50, r=200, t=70, b=50),
+            height=600,
+            width=1200,
+            template='plotly_white'
+        )
+
+        # Add subtle shaded regions for each source category.
+        start_idx = 0
+        for source in source_order:
+            source_data = gprofiler_results[gprofiler_results['source'] == source]
+            if not source_data.empty:
+                end_idx = start_idx + len(source_data)
+                fig.add_shape(
+                    type='rect',
+                    x0=start_idx, x1=end_idx,
+                    y0=0, y1=gprofiler_results['-log10(p_value)'].max(),
+                    fillcolor=px.colors.qualitative.Set2[source_order.index(source) % len(px.colors.qualitative.Set2)],
+                    opacity=0.1,  # Subtle shading
+                    line_width=0
+                )
+                fig.add_annotation(
+                    x=(start_idx + end_idx) / 2,
+                    y=-1,  # Position below the x-axis
+                    text=source,
+                    showarrow=False,
+                    font=dict(size=12, color="black"),
+                    xanchor="center",
+                    yanchor="top"
+                )
+                start_idx = end_idx
+
+        # Adjust circle size scaling for better separation.
+        fig.update_traces(
+            marker=dict(
+                sizemode='area',
+                sizeref=2. * max(gprofiler_results['intersection_size']) / (50 ** 2),  # Reduce circle size scaling
+                sizemin=4
+            )
+        )
+
+        return fig
+    
+
