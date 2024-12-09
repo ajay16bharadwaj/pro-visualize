@@ -40,7 +40,7 @@ class ProteinVisualization:
     "pig": "sscrofa",
     "cow": "btaurus",
     "chicken": "ggallus"
-}
+    }
     
     def __init__(self):
         self.protein_data = None
