@@ -450,7 +450,7 @@ class ProteinVisualization:
         condition_groups = {condition: group for condition, group in self.analysis_with_annotation.groupby(COL_DEPLABEL)}
         return condition_groups
     
-    def plot_volcano(self, df, FC, p_val):
+    def plot_volcano(self, df, FC, p_val, selected_proteins, config):
         """Generate volcano plot."""
         if self.protein_data_annotated is None: 
             raise ValueError("Annotated Protein data is required to display Gene and Protein Description information")
@@ -464,29 +464,41 @@ class ProteinVisualization:
         df.loc[(df[self.COL_DEPSIGNIF] <= p_val) & (df['log2FC'] > FC), 'label'] = 'Up-regulated'
         df.loc[(df[self.COL_DEPSIGNIF] <= p_val) & (df['log2FC'] < -FC), 'label'] = 'Down-regulated'
     
-        fig = px.scatter(df, x='log2FC', y='sig', color='label', color_discrete_map=self.color_map, hover_data=['Gene Name', 'Protein Description'])
+        fig = px.scatter(df, x='log2FC', y='sig', color='label', color_discrete_map=config["colors"], hover_data=['Gene Name', 'Protein Description'])
             
             # Customizing the layout
         #fig.update_layout(title=f'Volcano Plot with </b>FC = ±{FC} p-value = {p_val} ', xaxis_title="log2 fold change", yaxis_title="-log10(FDR)", legend_title_text='Category')
 
+        # Apply user-defined plot customizations
         fig.update_layout(
-            title={
-                'text': f"Volcano Plot<br><sup>FC = ±{FC} | p-value = {p_val}</sup>",
-                'x': 0.5,
-                'y': 0.95,
-                'xanchor': 'center',
-                'yanchor': 'top'
-            },
-            xaxis_title="log2 fold change",
-            yaxis_title="-log10(FDR)",
-            legend_title_text='Category'
+            title=config["title"],
+            xaxis_title=config["x_label"],
+            yaxis_title=config["y_label"],
+            font=dict(size=config["label_size"]),
         )
+
+        # Add annotations for selected proteins
+        if selected_proteins:
+            for protein in selected_proteins:
+                protein_data = df[df["Gene Name"] == protein]
+                if not protein_data.empty:
+                    fig.add_annotation(
+                        x=protein_data["log2FC"].values[0],
+                        y=protein_data["sig"].values[0],
+                        text=protein,
+                        showarrow=True,
+                        arrowhead=2,
+                        arrowsize=1,
+                        ax=20,
+                        ay=-30
+                    )
             
-            # Adding horizontal and vertical lines for cutoffs
-        fig.add_shape(type="line", x0=-FC, y0=0, x1=-FC, y1=df['sig'].max(), line=dict(color="RoyalBlue", width=2, dash="dot"))
-        fig.add_shape(type="line", x0=FC, y0=0, x1=FC, y1=df['sig'].max(), line=dict(color="RoyalBlue", width=2, dash="dot"))
-        fig.add_shape(type="line", x0=df['log2FC'].min(), y0=-np.log10(p_val), x1=df['log2FC'].max(), y1=-np.log10(p_val),line=dict(color="Red", width=2, dash="dot"))
-    
+        # Add threshold lines if enabled
+        if config["threshold_lines"]:
+            fig.add_shape(type="line", x0=-FC, y0=0, x1=-FC, y1=df["sig"].max(), line=dict(color="RoyalBlue", width=2, dash="dot"))
+            fig.add_shape(type="line", x0=FC, y0=0, x1=FC, y1=df["sig"].max(), line=dict(color="RoyalBlue", width=2, dash="dot"))
+            fig.add_shape(type="line", x0=df["log2FC"].min(), y0=-np.log10(p_val), x1=df["log2FC"].max(), y1=-np.log10(p_val), line=dict(color="Red", width=2, dash="dot"))
+        
         return fig
 
     def plot_protein_overlap(self):
@@ -713,7 +725,7 @@ class ProteinVisualization:
 
         return fig
 
-    def plot_heatmap(self, df):
+    def plot_heatmap(self, df, heatmap_config):
 
         from sklearn.preprocessing import MinMaxScaler
 
@@ -728,18 +740,38 @@ class ProteinVisualization:
         #df = df.drop('Protein', axis=1)
 
         scaler = MinMaxScaler()
-        df1_norm = pd.DataFrame(scaler.fit_transform(filtered_df), columns=filtered_df.columns, index=filtered_df.index)
+        df_norm = pd.DataFrame(scaler.fit_transform(filtered_df), columns=filtered_df.columns, index=filtered_df.index)
 
 
+        # Generate the heatmap using dash_bio.Clustergram
         fig = dash_bio.Clustergram(
-        data=df1_norm,
-        column_labels=list(df1_norm.columns.values),
-        row_labels=list(df1_norm.index),
-        height=600,
-        width=600
+            data=df_norm,
+            column_labels=list(df_norm.columns.values),
+            row_labels=list(df_norm.index),
+            color_map=heatmap_config["color_gradient"],
+            height=heatmap_config["height"],
+            width=heatmap_config["width"]
         )
-        
-        fig.update_layout(title=f'Heatmap', xaxis_title="samples", yaxis_title="Proteins") # type: ignore
+
+        # Apply layout settings from heatmap_config
+        fig.update_layout(
+            title={
+                "text": heatmap_config["title"],
+                "font": {"size": heatmap_config["title_font_size"]}
+            },
+            xaxis={
+                "title": {
+                    "text": heatmap_config["x_label"],
+                    "font": {"size": heatmap_config["x_label_font_size"]},
+                }
+            },
+            yaxis={
+                "title": {
+                    "text": heatmap_config["y_label"],
+                    "font": {"size": heatmap_config["y_label_font_size"]},
+                }
+            },
+        )
 
         return fig  
     

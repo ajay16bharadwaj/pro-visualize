@@ -35,3 +35,32 @@ ORGANISM_DICT = {
 # File upload settings
 SUPPORTED_FILE_FORMATS = ['.csv', '.tsv']
 DEFAULT_SEPARATOR = '\t'
+
+# Centralized figure defaults
+DEFAULT_VOLCANO_CONFIG = {
+    "title": "Volcano Plot",
+    "x_label": "Log2 Fold Change",
+    "y_label": "-Log10 FDR",
+    "label_size": 15,
+    "colors": {
+        "Up-regulated": "#D55E00",
+        "Down-regulated": "#0072B2",
+        "Non-significant": "#999999",
+        "Significant, no change": "#F0E442",
+    },
+    "threshold_lines": True,
+}
+
+# heatmap_config.py
+
+DEFAULT_HEATMAP_CONFIG = {
+    "title": "Heatmap",
+    "x_label": "Samples",
+    "y_label": "Proteins",
+    "color_gradient": "viridis",
+    "height": 600,
+    "width": 600,
+    "title_font_size": 16,
+    "x_label_font_size": 14,
+    "y_label_font_size": 14,
+}
