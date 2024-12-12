@@ -64,3 +64,9 @@ DEFAULT_HEATMAP_CONFIG = {
     "x_label_font_size": 14,
     "y_label_font_size": 14,
 }
+
+DEFAULT_VIOLIN_CONFIG = {
+    "title": "Violin Plot",
+    "label_size": 15,
+    "colors": {},
+}

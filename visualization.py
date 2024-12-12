@@ -604,12 +604,13 @@ class ProteinVisualization:
 
         return fig
     
-    def plot_violin_with_subplots(self, protein_list):
+    def plot_violin_with_subplots(self, protein_list, config):
         from plotly.subplots import make_subplots
         """
         Generate a violin plot for one or more proteins with subplots, dynamically colored by groups.
         Args:
             protein_list: List of proteins to generate the plot for (can be a single protein or a list).
+            config: Dictionary containing plot configurations, including colors for groups.
         Returns:
             fig: Plotly figure of the violin plot(s) in subplots.
         """
@@ -622,14 +623,11 @@ class ProteinVisualization:
             protein_list = [protein_list]
         
         df = self.protein_data.copy()
-        # Filter protein data for the specified proteins
-        #ensure only sample columns are present. 
+        # Filter protein data for the specified proteins and ensure only sample columns are present
         sample_columns = list(self.annotation_info.SampleName.unique())
         filtered_df = df[['Protein'] + [col for col in sample_columns if col in df.columns]]
 
-
-        #need to set the index and scale it before plotting. 
-
+        # Filter for the requested proteins
         df_filtered = filtered_df[filtered_df['Protein'].isin(protein_list)]
         if df_filtered.empty:
             raise ValueError("None of the specified proteins were found in the protein data.")
@@ -639,12 +637,18 @@ class ProteinVisualization:
         
         # Merge with annotation info to get the group labels for each sample
         df_long = pd.merge(df_long, self.annotation_info, how='left', left_on='Sample', right_on='SampleName')
-        
-        # Dynamically assign colors based on unique groups in the annotation
+
+        # Handle colors: Use default Plotly palette if config["colors"] is empty
         unique_groups = df_long['Group'].unique()
-        colors = px.colors.qualitative.Plotly[:len(unique_groups)]  # Select colors dynamically
-        color_discrete_map = {group: color for group, color in zip(unique_groups, colors)}
+        if not config.get("colors"):  # Check if the "colors" dictionary is empty
+            default_colors = px.colors.qualitative.Plotly[:len(unique_groups)]
+            config["colors"] = {group: default_colors[i % len(default_colors)] for i, group in enumerate(unique_groups)}
+
+    
         
+        # Dynamically assign colors based on the configuration
+        color_discrete_map = config["colors"]
+
         # Set up the subplot structure
         num_proteins = len(protein_list)
         cols = 3  # Define the number of columns for the subplots
@@ -683,7 +687,7 @@ class ProteinVisualization:
                         jitter=0.05,  # Jitter for scatter points
                         scalegroup=protein,
                         side='both',  # Plot on both sides of the axis for wider violin plots
-                        fillcolor=color_discrete_map[group],  # Apply the group-specific color
+                        fillcolor=color_discrete_map.get(group, "gray"),  # Use user-defined color
                         line_color="black",  # Color for the box outline
                         width=0.8,  # Make the violin plots wider
                         box_fillcolor="white",  # White box for the middle
@@ -702,9 +706,9 @@ class ProteinVisualization:
                 showexponent='all'
             )
 
-        # Add the legend manually to show color associations
+        # Update layout with title and legend
         fig.update_layout(
-            title=f"Violin Plot - Top Differentially Expressed Proteins",
+            title=config["title"],  # Use user-configured title
             height=400 * rows,  # Adjust the height based on the number of rows
             width=1200,  # Adjust the width of the plot
             showlegend=True,

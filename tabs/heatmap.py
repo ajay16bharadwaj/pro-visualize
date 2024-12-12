@@ -62,24 +62,28 @@ def render_heatmap(vis, figures_dict, analysis_status, protein_status, annotatio
         color_gradient = st.selectbox(
             "Color Gradient",
             ["viridis", "plasma", "cividis", "coolwarm", "inferno"],
-            index=["viridis", "plasma", "cividis", "coolwarm", "inferno"].index(st.session_state.heatmap_config["color_gradient"])
+            index=["viridis", "plasma", "cividis", "coolwarm", "inferno"].index(st.session_state.heatmap_config["color_gradient"]),
+            key='heatmap_tab_color_gradient_select'
         )
-        height = st.slider("Plot Height", 400, 1000, st.session_state.heatmap_config["height"])
-        width = st.slider("Plot Width", 400, 1000, st.session_state.heatmap_config["width"])
+        height = st.slider("Plot Height", 400, 1000, st.session_state.heatmap_config["height"], key='heatmap_tab_plot_height_slider')
+        width = st.slider("Plot Width", 400, 1000, st.session_state.heatmap_config["width"], key='heatmap_tab_plot_width_slider')
         title_font_size = st.slider(
             "Title Font Size",
             10, 40,
-            st.session_state.heatmap_config["title_font_size"]
+            st.session_state.heatmap_config["title_font_size"],
+            key='heatmap_tab_title_font_slider'
         )
         x_label_font_size = st.slider(
             "X-axis Font Size",
             10, 30,
-            st.session_state.heatmap_config["x_label_font_size"]
+            st.session_state.heatmap_config["x_label_font_size"],
+            key='heatmap_tab_x_label_font_slider'
         )
         y_label_font_size = st.slider(
             "Y-axis Font Size",
             10, 30,
-            st.session_state.heatmap_config["y_label_font_size"]
+            st.session_state.heatmap_config["y_label_font_size"],
+            key='heatmap_tab_y_label_font_slider'
         )
 
         # Update heatmap config

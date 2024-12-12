@@ -7,6 +7,7 @@ from io import BytesIO
 import numpy as np
 import dash_bio
 from sklearn.preprocessing import MinMaxScaler
+from compute_functions import create_download_button
 from tabs.clustering import render_clustering
 from tabs.functional_annotation import render_functional_annotation
 from tabs.quantifications import render_quantification_plots
@@ -148,3 +149,6 @@ with tab7:
 with tab8:
     st.write("Uniprot Annotations")
     render_get_uniprot_annotation(vis)
+
+with st.sidebar:
+    create_download_button(figures_dict)

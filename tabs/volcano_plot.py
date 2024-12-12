@@ -32,7 +32,8 @@ def render_volcano_plot(vis, figures_dict, analysis_status, protein_status, anno
         label_size = st.slider(
             "Label Font Size", 
             10, 30, 
-            st.session_state.user_config["label_size"]
+            st.session_state.user_config["label_size"],
+            key='volcano_tab_label_font_slider'
         )
         
         # Organize color pickers into two columns
@@ -61,6 +62,30 @@ def render_volcano_plot(vis, figures_dict, analysis_status, protein_status, anno
             st.session_state.user_config["threshold_lines"]
         )
 
+        # Buttons for applying changes and resetting to defaults
+        apply_col, reset_col = st.columns([1, 1])
+        with apply_col:
+            if st.button("Apply Changes", key='volcano_apply_changes'):
+                st.session_state.user_config.update({
+                    "title": title,
+                    "x_label": x_label,
+                    "y_label": y_label,
+                    "label_size": label_size,
+                    "colors": {
+                        "Up-regulated": upregulated_color,
+                        "Down-regulated": downregulated_color,
+                        "Non-significant": nonsignificant_color,
+                        "Significant, no change": significant_no_change_color,
+                    },
+                    "threshold_lines": threshold_lines,
+                })
+                st.toast("Plot customization updated!", icon="✅")
+                
+        with reset_col:
+            if st.button("Reset to Defaults", key='volcano_reset_defaults'):
+                st.session_state.user_config = DEFAULT_VOLCANO_CONFIG.copy()
+                st.toast("Reset to default settings!", icon="🔄") 
+
     protein_highlight_select = st.checkbox('Choose Gene Names to highlight', key='volcano_plot_custom_select')
     #if certain proteins need to be highlighted 
     if protein_highlight_select:
@@ -76,29 +101,7 @@ def render_volcano_plot(vis, figures_dict, analysis_status, protein_status, anno
             
             selected_genes_for_volcano = list(selection['Gene Name'])
 
-    # Buttons for applying changes and resetting to defaults
-    apply_col, reset_col = st.columns([1, 1])
-    with apply_col:
-        if st.button("Apply Changes", key='volcano_apply_changes'):
-            st.session_state.user_config.update({
-                "title": title,
-                "x_label": x_label,
-                "y_label": y_label,
-                "label_size": label_size,
-                "colors": {
-                    "Up-regulated": upregulated_color,
-                    "Down-regulated": downregulated_color,
-                    "Non-significant": nonsignificant_color,
-                    "Significant, no change": significant_no_change_color,
-                },
-                "threshold_lines": threshold_lines,
-            })
-            st.toast("Plot customization updated!", icon="✅")
-            
-    with reset_col:
-        if st.button("Reset to Defaults", key='volcano_reset_defaults'):
-            st.session_state.user_config = DEFAULT_VOLCANO_CONFIG.copy()
-            st.toast("Reset to default settings!", icon="🔄")    
+       
 
     # Generate the plot
     fig = vis.plot_volcano(condition_groups[volcano_comparison_input], volcano_log2fc_threshold, volcano_fdr_threshold, selected_genes_for_volcano, st.session_state.user_config)
