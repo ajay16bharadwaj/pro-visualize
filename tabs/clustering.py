@@ -1,13 +1,13 @@
 from utils.decorators import validate_inputs, safe_tab_execution
-from config import DEFAULT_COL_DEPLABEL, DEFAULT_FDR_THRESHOLD, DEFAULT_LOG2FC_THRESHOLD 
+from config import DEFAULT_COL_DEPLABEL, DEFAULT_FDR_THRESHOLD, DEFAULT_LOG2FC_THRESHOLD, DEFAULT_PCA_BY_ANNOTATION_CONFIG 
 import streamlit as st
 import pandas as pd
 from utils.helpers import dataframe_with_selections
 
 #clustering plots - Tab Code. Need documentation for what the plot is? 
-@safe_tab_execution("Clustering")
+#@safe_tab_execution("Clustering")
 @validate_inputs(protein_status=True, annotation_status=True)
-def render_clustering(vis, figures_dict, protein_status, annotation_status, **kwargs):
+def render_clustering(vis, figures_dict, protein_status, annotation_status,global_config, **kwargs):
     """Render clustering plots Tab and update figures_dict."""
     clust_tab1, clust_tab2, clust_tab3 = st.tabs(["PCA", "UMAP", "T-SNE"])
     with clust_tab1: 
@@ -19,7 +19,84 @@ def render_clustering(vis, figures_dict, protein_status, annotation_status, **kw
         #PCA computation. 
         vis.preprocess_for_pca()
         #st.write(vis.protein_data_for_pca)
-        pca_plot_by_annotation = vis.plot_pca_by_annotation()
+        # Initialize session state for PCA config
+        if "pca_config" not in st.session_state:
+            st.session_state.pca_config = DEFAULT_PCA_BY_ANNOTATION_CONFIG.copy()
+
+        # Create a temporary config for user inputs
+        user_inputs = st.session_state.pca_config.copy()
+
+        # User inputs for customizing the PCA plot
+        with st.expander("Customize PCA Plot"):
+            user_inputs["title"] = st.text_input(
+                "Plot Title", 
+                user_inputs["title"], 
+                key="pca_plot_title"
+            )
+            user_inputs["x_label"] = st.text_input(
+                "X-axis Label", 
+                user_inputs["x_label"], 
+                key="pca_x_label"
+            )
+            user_inputs["y_label"] = st.text_input(
+                "Y-axis Label", 
+                user_inputs["y_label"], 
+                key="pca_y_label"
+            )
+            user_inputs["marker_size"] = st.slider(
+                "Marker Size", 
+                5, 20, 
+                user_inputs["marker_size"], 
+                key="pca_marker_size"
+            )
+            user_inputs["marker_symbol"] = st.selectbox(
+                "Marker Symbol", 
+                ["circle", "star", "cross", "diamond", "square", "plus"], 
+                index=["circle", "star", "cross", "diamond", "square", "plus"].index(user_inputs.get("marker_symbol", "circle")
+                ),                                                                                     
+                key="pca_marker_symbol"
+            )
+            user_inputs["jitter"] = st.slider(
+                "Jitter (Overlap Reduction)", 
+                0.0, 1.0, 
+                user_inputs["jitter"], 
+                key="pca_jitter"
+            )
+            user_inputs["width"] = st.slider(
+                "Plot Width", 
+                400, 1200, 
+                user_inputs["width"], 
+                key="pca_width"
+            )
+            user_inputs["height"] = st.slider(
+                "Plot Height", 
+                400, 1200, 
+                user_inputs["height"], 
+                key="pca_height"
+            )
+
+        # Apply and Reset buttons
+        apply_col, reset_col = st.columns([1, 1])
+        with apply_col:
+            if st.button("Apply Changes", key="pca_apply_changes"):
+                st.session_state.pca_config = user_inputs.copy()
+                st.toast("PCA plot configuration updated!", icon="✅")
+        with reset_col:
+            if st.button("Reset to Default", key="pca_reset_default"):
+                st.session_state.pca_config = DEFAULT_PCA_BY_ANNOTATION_CONFIG.copy()
+                st.toast("PCA plot configuration reset to defaults!", icon="🔄")
+
+        st.write(config=st.session_state.pca_config)
+        
+        # Generate the PCA plot using updated configuration and global group colors
+        pca_plot_by_annotation = vis.plot_pca_by_annotation(
+            config=st.session_state.pca_config,
+            group_column="Group",
+            color_discrete_map=global_config["group_colors"]
+        )
+        figures_dict["pca_plot_by_annotation"] = pca_plot_by_annotation
+
+        #pca_plot_by_annotation = vis.plot_pca_by_annotation()
         pca_plot_by_clusters = vis.plot_pca_with_clusters_plotly()
         hierarchial_clustering_dendogram = vis.plot_vertical_dendrogram()
         cluster_assignment_table = vis.create_cluster_assignment_table()

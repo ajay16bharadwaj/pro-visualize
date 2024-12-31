@@ -20,11 +20,13 @@ from visualization import ProteinVisualization
 from config import (
     DEFAULT_COL_DEPLABEL,
     DEFAULT_COL_DEPSIGNIF,
+    DEFAULT_GENE_NAME_COLUMN,
     COLOR_MAP,
     ORGANISM_DICT,
     DEFAULT_FDR_THRESHOLD,
     DEFAULT_LOG2FC_THRESHOLD,
-    DEFAULT_SEPARATOR
+    DEFAULT_SEPARATOR,
+    DEFAULT_GLOBAL_CONFIG,
 )
 
 
@@ -108,6 +110,56 @@ with st.container():
             else:
                 st.info(" Preview available after file upload", icon="ℹ️")
  
+# Default settings
+global_config = DEFAULT_GLOBAL_CONFIG.copy()
+if "global_config" not in st.session_state:
+            st.session_state.global_config = DEFAULT_GLOBAL_CONFIG.copy()
+
+with st.expander("⚙️ Global Configuration", expanded=False):
+    st.header("Global Configuration")
+    
+
+    # Default settings
+    global_config["default_col_label"] = st.text_input(
+        "Default Label Column", 
+        global_config["default_col_label"], 
+        key="global_col_label"
+    )
+    global_config["default_col_significance"] = st.text_input(
+        "Default Significance Column", 
+        global_config["default_col_significance"], 
+        key="global_col_significance"
+    )
+    global_config["default_gene_name_column"] = st.text_input(
+        "Default Gene Name Column", 
+        global_config["default_gene_name_column"], 
+        key="global_gene_name_column"
+    )
+
+    # Customize group colors
+    st.subheader("Group Colors")
+    unique_groups = vis.annotation_info['Group'].unique() if vis.annotation_info is not None else []
+    default_colors = px.colors.qualitative.Plotly[:len(unique_groups)]
+    for i, group in enumerate(unique_groups):
+        default_color = default_colors[i] if i < len(default_colors) else f"#%06x" % (0xFFFFFF & hash(group))
+        global_config["group_colors"][group] = st.color_picker(
+            f"Color for {group}",
+            default_color,
+            key=f"global_group_color_{group}"
+        )
+
+    # Apply and Reset Buttons
+    apply_col, reset_col = st.columns([1, 1])
+    with apply_col:
+        if st.button("Apply Changes", key="global_apply_changes"):
+            st.session_state.global_config = global_config.copy()
+            st.toast("Global configuration updated!", icon="✅")
+    with reset_col:
+        if st.button("Reset to Default", key="global_reset_default"):
+            st.session_state.global_config = DEFAULT_GLOBAL_CONFIG.copy()
+            st.session_state.global_config['colors'] = default_colors
+
+
 
 #initializing tabs
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(["Volcano Plot", "Heat Maps", "Violin Plot", "Quantification", "Clustering", "Venn Diagram", "Functional Analysis and Biological Annotations", "Get Uniprot annotations"])
@@ -124,16 +176,16 @@ with tab2:
 #violin plots
 with tab3:
     #st.write("Violin Plots")
-    render_violin_plot(vis, figures_dict, analysis_status=analysis_status, protein_status=protein_level_status, annotation_status=annotation_status)
+    render_violin_plot(vis, figures_dict, analysis_status=analysis_status, protein_status=protein_level_status, annotation_status=annotation_status, global_config=st.session_state.global_config)
 
 #quantification plots 
 with tab4:
     #st.write("quantification")
-    render_quantification_plots(vis, figures_dict, protein_status=protein_level_status, annotation_status=annotation_status)
+    render_quantification_plots(vis, figures_dict, protein_status=protein_level_status, annotation_status=annotation_status, global_config=st.session_state.global_config)
     
 #clustering
 with tab5:
-    render_clustering(vis, figures_dict, protein_status=protein_level_status, annotation_status=annotation_status)
+    render_clustering(vis, figures_dict, protein_status=protein_level_status, annotation_status=annotation_status, global_config=st.session_state.global_config)
 
 #venn diagram
 with tab6:

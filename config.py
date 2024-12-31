@@ -70,3 +70,39 @@ DEFAULT_VIOLIN_CONFIG = {
     "label_size": 15,
     "colors": {},
 }
+
+DEFAULT_PROTEIN_PER_SAMPLE_CONFIG = {
+    "title": "Proteins Per Sample",
+    "x_label": "Sample Name",
+    "y_label": "Number of Proteins",
+    "label_font_size": 15,
+    "title_font_size": 20,
+    "colors": {},  # Colors will be populated dynamically based on group
+}
+
+DEFAULT_GLOBAL_CONFIG = {
+    "group_colors": {},
+    "default_col_label": DEFAULT_COL_DEPLABEL,
+    "default_col_significance": DEFAULT_COL_DEPSIGNIF,
+    "default_gene_name_column": DEFAULT_GENE_NAME_COLUMN,
+}
+
+DEFAULT_PROTEIN_INTENSITY_DENSITY_CONFIG = {
+    "title": "Density Plot",
+    "x_label": "log10 Intensity",
+    "y_label": "Density Estimate",
+    "nbins": 50,
+    "height": 800,
+    "width": 1200,
+}
+
+DEFAULT_PCA_BY_ANNOTATION_CONFIG = {
+    "title": "PCA Plot - Colored by Group",
+    "x_label": "PC1",
+    "y_label": "PC2",
+    "marker_size": 8,
+    "marker_symbol": "circle",
+    "jitter": 0.3,  # Add jitter to avoid overlap
+    "width": 800,
+    "height": 600,
+}

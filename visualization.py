@@ -124,51 +124,77 @@ class ProteinVisualization:
         self.protein_data_for_violin_plot = df 
         return self.protein_data_for_violin_plot
 
-    # PCA plot by annotation
-    def plot_pca_by_annotation(self, group_column='Group', pc_x=1, pc_y=2):
-        """Plot PCA colored by group annotations"""
-        # Ensure that the protein data and annotation info have been loaded
+    def plot_pca_by_annotation(self, config=None, group_column='Group', pc_x=1, pc_y=2, color_discrete_map=None):
+        """
+        Plot PCA colored by group annotations.
+
+        Args:
+            config (dict): Configuration dictionary with keys:
+                - title: Plot title
+                - marker_size: Size of plot markers
+                - jitter: Magnitude of jitter for PCA components
+            group_column (str): Column name in annotation data for grouping.
+            pc_x (int): Principal component for the x-axis.
+            pc_y (int): Principal component for the y-axis.
+            color_discrete_map (dict): Custom color mapping for groups.
+
+        Returns:
+            fig: Plotly figure of PCA.
+        """
+        # Ensure data is loaded
         if self.protein_data is None or self.annotation_info is None:
             raise ValueError("Protein data or annotation info not loaded.")
 
         if self.protein_data_for_pca is None:
-            self.preprocess_for_pca()  # Preprocess if not already done
+            self.preprocess_for_pca()
 
         df = self.protein_data_for_pca
-        
-        # Step 1: Standardize data
+
+        if config is None:
+            config = {
+                "title": f"PCA Plot - Colored by {group_column}",
+                "marker_size": 8,
+                "marker_symbol": "circle",
+                "jitter": 0.3,
+            }
+
+        # Standardize data
         scaler = StandardScaler()
         scaled_data = scaler.fit_transform(df.T)
-    
-        # Step 2: Perform PCA
+
+        # Perform PCA
         pca = PCA(n_components=3)
         pca_components = pca.fit_transform(scaled_data)
         pca_df = pd.DataFrame(data=pca_components, columns=[f'PC{i+1}' for i in range(3)])
-    
-        # Adding jitter to avoid overlap
-        jitter = np.random.normal(0, 0.3, size=pca_df.shape)
-        pca_df['PC1'] += jitter[:, 0]  # Add jitter to PC1
-        pca_df['PC2'] += jitter[:, 1]  # Add jitter to PC2
-    
-        # Step 3: Merge annotation information
+
+        # Optionally add jitter
+        if config["jitter"] > 0:
+            jitter = np.random.normal(0, config["jitter"], size=pca_df.shape)
+            pca_df[f'PC{pc_x}'] += jitter[:, pc_x - 1]
+            pca_df[f'PC{pc_y}'] += jitter[:, pc_y - 1]
+
+        # Merge with annotation data
         pca_df = pd.concat([pca_df, self.annotation_info.reset_index()], axis=1)
-    
-        # Step 4: Create PCA plot colored by annotations
+
+        # Default colors if not provided
+        if color_discrete_map is None:
+            unique_groups = pca_df[group_column].unique()
+            default_colors = px.colors.qualitative.Plotly[:len(unique_groups)]
+            color_discrete_map = {group: color for group, color in zip(unique_groups, default_colors)}
+
+        # Create scatter plot
         fig = px.scatter(
             pca_df,
             x=f'PC{pc_x}',
             y=f'PC{pc_y}',
             color=group_column,
             hover_data=['SampleName'],
-            title=f'PCA Plot - Colored by {group_column}',
+            title=config["title"],
             labels={group_column: 'Groups'},
-            #text='SampleName',
-            color_discrete_map={'Northstar': 'blue', 'Vital': 'green', 'Individual': 'red'}
+            color_discrete_map=color_discrete_map
         )
-    
-        # Dynamically adjust the axis scale and the labels positioning
-        fig.update_traces(textposition='top center')
-        
+
+        # Customize layout
         fig.update_layout(
             xaxis_title=f'PC{pc_x} ({pca.explained_variance_ratio_[pc_x-1]*100:.1f}% Variance)',
             yaxis_title=f'PC{pc_y} ({pca.explained_variance_ratio_[pc_y-1]*100:.1f}% Variance)',
@@ -177,10 +203,10 @@ class ProteinVisualization:
             margin=dict(l=0, r=0, t=40, b=40),
             showlegend=True,
         )
-        
+
         # Adjust marker size
-        fig.update_traces(marker=dict(size=8))
-    
+        fig.update_traces(marker=dict(size=config["marker_size"], symbol=config["marker_symbol"]))
+
         return fig
 
     # PCA plot with clusters
@@ -540,12 +566,12 @@ class ProteinVisualization:
     
         return fig
     
-    def plot_proteins_per_sample(self, group_column='Group'): # type: ignore
+    def plot_proteins_per_sample(self, group_column='Group', color_discrete_map=None, config=None):  # Accept config
         """
         Creates a bar plot of the number of identified proteins per sample, dynamically colored by groups.
         """
         # Preprocessing to count proteins per sample (non-NaN values)
-        protein_data  = self.protein_data.copy()
+        protein_data = self.protein_data.copy()
         annotation_info = self.annotation_info.copy()
         protein_counts_per_sample = protein_data.iloc[:, 1:].notna().sum()
 
@@ -554,14 +580,15 @@ class ProteinVisualization:
             'SampleName': protein_data.columns[1:],  # Sample names as columns (exclude the Protein column)
             'ProteinCount': protein_counts_per_sample.values
         })
-        
+
         # Merge with annotation data to include groups
         merged_df = pd.merge(protein_counts_df, annotation_info, how='left', on='SampleName')
 
-        # Dynamically assign colors based on unique groups in the annotation
-        unique_groups = merged_df[group_column].unique()
-        colors = px.colors.qualitative.Plotly[:len(unique_groups)]  # Select colors dynamically
-        color_discrete_map = {group: color for group, color in zip(unique_groups, colors)}
+        # Use default colors if none are provided
+        # if color_discrete_map is None:
+        #     unique_groups = merged_df[group_column].unique()
+        #     colors = px.colors.qualitative.Plotly[:len(unique_groups)]  # Default colors
+        #     color_discrete_map = {group: color for group, color in zip(unique_groups, colors)}
 
         # Calculate the dynamic threshold for the horizontal line
         max_protein_count = merged_df['ProteinCount'].max()
@@ -573,12 +600,15 @@ class ProteinVisualization:
             x='SampleName',
             y='ProteinCount',
             color=group_column,
-            title="Identified Proteins per Sample",
-            labels={'ProteinCount': 'Number of Proteins', 'SampleName': 'Sample Name'},
-            color_discrete_map=color_discrete_map
+            title=config["title"],  # Title from config
+            labels={
+                'ProteinCount': config["y_label"],  # Y-axis label from config
+                'SampleName': config["x_label"]    # X-axis label from config
+            },
+            color_discrete_map=color_discrete_map  # Apply custom color mapping
         )
 
-        # Add a dynamic horizontal line based on the max protein count
+         #Add a dynamic horizontal line based on the max protein count
         fig.add_shape(
             type="line",
             x0=0,
@@ -593,13 +623,17 @@ class ProteinVisualization:
         # Update layout for better label placement and readability
         fig.update_layout(
             xaxis_tickangle=-45,  # Rotate x-axis labels for better readability
-            xaxis_tickfont=dict(size=12),  # Adjust font size
-            yaxis_title="Number of Proteins",
-            xaxis_title="Sample Name",
+            xaxis_tickfont=dict(size=config["label_font_size"]),  # Font size from config
+            yaxis_title=config["y_label"],
+            xaxis_title=config["x_label"],
             height=500,
-            width=900,
+            width=700,
             margin=dict(l=50, r=50, t=100, b=150),  # Adjust bottom margin for larger labels
-            legend_title="Group"
+            legend_title="Group",
+            title=dict(
+                text=config["title"],
+                font=dict(size=config["title_font_size"])  # Title font size from config
+            )
         )
 
         return fig
@@ -640,9 +674,9 @@ class ProteinVisualization:
 
         # Handle colors: Use default Plotly palette if config["colors"] is empty
         unique_groups = df_long['Group'].unique()
-        if not config.get("colors"):  # Check if the "colors" dictionary is empty
-            default_colors = px.colors.qualitative.Plotly[:len(unique_groups)]
-            config["colors"] = {group: default_colors[i % len(default_colors)] for i, group in enumerate(unique_groups)}
+        # if not config.get("colors"):  # Check if the "colors" dictionary is empty
+        #     default_colors = px.colors.qualitative.Plotly[:len(unique_groups)]
+        #     config["colors"] = {group: default_colors[i % len(default_colors)] for i, group in enumerate(unique_groups)}
 
     
         
@@ -959,7 +993,7 @@ class ProteinVisualization:
         
         return fig
     
-    def plot_intensity_density(self):
+    def plot_intensity_density(self, config, color_discrete_map=None):
         """
         Create density plots of protein intensities grouped by sample groups.
         Assumes that the annotation information includes a 'Group' column
@@ -970,48 +1004,50 @@ class ProteinVisualization:
             raise ValueError("Protein data or annotation info not loaded.")
         
         # Merge protein data with annotation info
+        # Merge protein data with annotation info
         df = self.protein_data.copy()
-        #ensure only sample columns are present. 
         sample_columns = list(self.annotation_info.SampleName.unique())
         filtered_df = df[['Protein'] + [col for col in sample_columns if col in df.columns]]
-
-
         filtered_df = pd.melt(filtered_df, id_vars=['Protein'], var_name='Sample', value_name='Intensity')
-        
-        # Log transformation to make the data more normally distributed
         filtered_df['log10(Intensity)'] = np.log10(filtered_df['Intensity'].replace(0, np.nan))
-        
-        # Merge with annotation info to add grouping
         filtered_df = filtered_df.merge(self.annotation_info, left_on='Sample', right_on='SampleName', how='left')
-        
+
+        # Aggregate intensities by group
+        group_data = filtered_df.groupby('Group')['log10(Intensity)'].apply(list).reset_index()
+
+        # Use default colors if no color mapping is provided
+        if color_discrete_map is None:
+            unique_groups = group_data['Group'].unique()
+            default_colors = px.colors.qualitative.Plotly[:len(unique_groups)]
+            color_discrete_map = {group: color for group, color in zip(unique_groups, default_colors)}
+
         # Create the density plot using plotly express
         fig = px.histogram(
             filtered_df,
             x='log10(Intensity)',
-            color='Sample',
-            facet_col='Group',
+            color='Group',
             histnorm='density',
             nbins=100,
             opacity=0.7,
-            title='Density Plot of Protein Intensities by Group',
-            labels={'log10(Intensity)': 'log10(Intensity)', 'Group': 'Group'},
-            height=600,
-            width=1000
+            title=config["title"],
+            labels={'log10(Intensity)': config["x_label"], 'Group': 'Group'},
+            height=config["height"],
+            width=config["width"],
+            color_discrete_map=color_discrete_map
         )
         
         # Update layout for better visibility
         fig.update_layout(
-            title_text='Density Plot of Protein Intensities by Group',
-            legend_title='Sample',
+            title_text=config["title"],
+            legend_title='Group',
             margin=dict(t=50, l=50, r=50, b=50),
-            xaxis_title='log10(Intensity)',
-            yaxis_title='Density'
+            xaxis_title=config["x_label"],
+            yaxis_title=config["y_label"]
         )
-        
-        # Adjust facet titles for better presentation
-        fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
-        
+
         return fig
+        
+        
     
     def plot_protein_rank_order(self, selected_proteins=[]):
         """

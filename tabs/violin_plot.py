@@ -7,16 +7,31 @@ import plotly.express as px
 
 @safe_tab_execution("Violin Plot")
 @validate_inputs(analysis_status=True, protein_status=True, annotation_status=True)
-def render_violin_plot(vis, figures_dict, analysis_status, protein_status, annotation_status, **kwargs):
+def render_violin_plot(vis, figures_dict, analysis_status, protein_status, annotation_status, global_config, **kwargs):
     """Render Violin Plot Tab and update figures_dict."""
     # Preprocess data for plotting
     violin_info = vis.dep_info.copy()  # type: ignore
-    violin_condition_groups = vis.volcano_preprocess(DEFAULT_COL_DEPLABEL)  # type: ignore
+    violin_condition_groups = vis.volcano_preprocess(global_config["default_col_label"])  # Use global config for default columns
+
+    column_label = global_config["default_col_label"]
+    significance_column = global_config["default_col_significance"]
+    group_colors = global_config["group_colors"]
+
+    #st.write('group_colors', group_colors)
     
     # Initialize session state for user configurations
     if "violin_config" not in st.session_state:
         st.session_state.violin_config = DEFAULT_VIOLIN_CONFIG.copy()
+        st.session_state.violin_config['colors'] = group_colors.copy()
 
+    # Synchronize session state colors with global_config
+    for group, color in group_colors.items():
+        if group not in st.session_state.violin_config['colors']:
+            st.session_state.violin_config['colors'][group] = color
+        elif st.session_state.violin_config['colors'][group] != color:
+            st.session_state.violin_config['colors'][group] = color
+
+    #st.write('group_colors_in_session_state', st.session_state.violin_config['colors'])
 
     # Threshold and comparison inputs
     col1, col2 = st.columns(2)
@@ -44,7 +59,7 @@ def render_violin_plot(vis, figures_dict, analysis_status, protein_status, annot
     # Differentially expressed proteins
     df = violin_condition_groups[violin_comparison_input]
     dep_list_df = df[
-        (df['Imputed.FDR'] < violin_fdr_threshold) & 
+        (df[significance_column] < violin_fdr_threshold) & 
         ((df['log2FC'] < -(violin_log2fc_threshold)) | 
          (df['log2FC'] > violin_log2fc_threshold))
     ]
@@ -52,26 +67,16 @@ def render_violin_plot(vis, figures_dict, analysis_status, protein_status, annot
 
     # Customize Plot Section
     with st.expander("Customize Violin Plot"):
-        title = st.text_input("Plot Title", st.session_state.violin_config["title"])
+        title = st.text_input("Plot Title", st.session_state.violin_config.get("title", "Violin Plot"))
         label_size = st.slider(
             "Label Font Size", 
             10, 30, 
-            st.session_state.violin_config["label_size"]
+            st.session_state.violin_config.get("label_size", 15)
         )
         
-        # Dynamic color pickers for group-based coloring
-        # Use Plotly's qualitative palette for default colors
-        group_colors = {}
+        # Merge global group colors with user-defined group colors
         unique_groups = vis.annotation_info['Group'].unique()
         default_colors = px.colors.qualitative.Plotly[:len(unique_groups)]
-
-        for i, group in enumerate(unique_groups):
-            # Assign a unique default color to each group from Plotly's palette
-            default_color = default_colors[i] if i < len(default_colors) else f"#%06x" % (0xFFFFFF & hash(group))
-            group_colors[group] = st.color_picker(
-                f"Color for {group}",
-                st.session_state.violin_config["colors"].get(group, default_color)
-            )
         
         # Buttons for Apply and Reset
         apply_col, reset_col = st.columns([1, 1])
@@ -79,19 +84,21 @@ def render_violin_plot(vis, figures_dict, analysis_status, protein_status, annot
             if st.button("Apply Changes", key='violin_apply_changes'):
                 st.session_state.violin_config.update({
                     "title": title,
-                    "label_size": label_size,
-                    "colors": group_colors
+                    "label_size": label_size
                 })
                 st.toast("Plot customization updated!", icon="✅")
         with reset_col:
             if st.button("Reset to Defaults", key='violin_reset_defaults'):
-                st.session_state.violin_config = DEFAULT_VIOLIN_CONFIG.copy()
+                st.session_state.violin_config["title"] = DEFAULT_VIOLIN_CONFIG["title"]
+                st.session_state.violin_config["label_size"] = DEFAULT_VIOLIN_CONFIG["label_size"]
+                st.session_state.violin_config["colors"] = group_colors.copy()
+                st.toast("Reset to default settings, retaining colors!", icon="🔄")
                 st.toast("Reset to default settings!", icon="🔄")
 
     # Protein Selection
     custom_row_select = st.checkbox('Choose custom entries', key='violin_custom_select')
     if custom_row_select:
-        subset_df = df[['Protein', 'log2FC', 'Imputed.FDR', 'Gene Name', 'Protein Description']]
+        subset_df = df[['Protein', 'log2FC', significance_column, 'Gene Name', 'Protein Description']]
         selection = dataframe_with_selections(subset_df, "violin_custom_df_select")
         with st.expander("Your selection"):
             st.write(selection)
