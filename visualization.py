@@ -872,126 +872,134 @@ class ProteinVisualization:
 
         return fig
     
-    def plot_umap(self):
-        import umap
+    def plot_umap(self, config):
         """
-        Generates an improved UMAP plot with dynamic color assignment based on sample groups.
+        Generates a UMAP plot with dynamic configuration for colors and plot settings.
         
-        Parameters:
-        - self: Instance of the ProteinVisualization class.
+        Args:
+            config (dict): Configuration dictionary for plot settings, including colors and title.
         
         Returns:
-        - fig: Plotly figure object for UMAP projection.
+            fig: Plotly figure object for UMAP projection.
         """
-        # Ensure that protein data and annotation info are loaded
+        import umap
+        # Ensure protein data and annotation info are loaded
         if self.protein_data is None or self.annotation_info is None:
             raise ValueError("Protein data or annotation information not loaded.")
 
         # Preprocess protein data for UMAP
-        df = self.preprocess_for_pca()  # You can reuse the PCA preprocessing method for UMAP
+        df = self.preprocess_for_pca()
         df = df.T  # Transpose to have samples as rows and proteins as columns
+        df = df.loc[self.annotation_info['SampleName']]  # Match samples in annotation info
 
-        # Ensure that the dimensions match between annotation and data
-        df = df.loc[self.annotation_info['SampleName']]  # Ensure samples match the annotation info
-        
-        # Perform UMAP on the preprocessed protein data
+        # Perform UMAP
         reducer = umap.UMAP(random_state=42, n_neighbors=15, min_dist=0.1)
         umap_embedding = reducer.fit_transform(df)
 
-        # Add UMAP projection columns to the annotation info DataFrame
+        # Add UMAP projections to annotation info
         self.annotation_info['UMAP1'] = umap_embedding[:, 0]
         self.annotation_info['UMAP2'] = umap_embedding[:, 1]
 
-        # Get unique groups dynamically from the annotation file and create color mapping
-        unique_groups = self.annotation_info['Group'].unique()
-        color_palette = px.colors.qualitative.Plotly  # Dynamic color palette from Plotly
-        color_discrete_map = {group: color_palette[i % len(color_palette)] for i, group in enumerate(unique_groups)}
+        # Use colors from the config
+        color_discrete_map = config["colors"]
 
-        # Create UMAP plot using Plotly Express
+        # Create UMAP plot
         fig = px.scatter(
             self.annotation_info,
-            x='UMAP1',
-            y='UMAP2',
-            color='Group',
-            hover_data=['SampleName'],
-            title="UMAP Projection",
-            labels={'UMAP1': 'UMAP1', 'UMAP2': 'UMAP2'},
-            color_discrete_map=color_discrete_map
+            x="UMAP1",
+            y="UMAP2",
+            color="Group",
+            hover_data=["SampleName"],
+            title=config["title"],
+            labels={"UMAP1": "UMAP1", "UMAP2": "UMAP2"},
+            color_discrete_map=color_discrete_map,
         )
 
-        # Update layout to improve aesthetics
-        fig.update_traces(marker=dict(size=10))
+        # Update layout
+        fig.update_traces(marker=dict(size=config["marker_size"]))
         fig.update_layout(
-            height=600,
-            width=800,
+            height=config["height"],
+            width=config["width"],
             legend_title_text="Groups",
             title_x=0.5,
             title_font=dict(size=20),
             font=dict(size=12),
-            margin=dict(l=40, r=40, t=60, b=40)
+            margin=dict(l=40, r=40, t=60, b=40),
         )
 
         return fig
         
 
-    def plot_tsne(self, group_column='Group', n_components=2, perplexity=10):
+    def plot_tsne(self, config, group_column='Group', n_components=2, perplexity=10):
+        """
+        Generate a t-SNE plot with dynamic configuration for colors, marker size, and labels.
+        
+        Args:
+            config (dict): Configuration dictionary for plot settings.
+            group_column (str): Column name for grouping samples.
+            n_components (int): Number of t-SNE components (default: 2).
+            perplexity (int): Perplexity value for t-SNE (default: 10).
+
+        Returns:
+            fig: Plotly figure for t-SNE projection.
+        """
         from sklearn.preprocessing import StandardScaler
         from sklearn.manifold import TSNE
-        """Generate a t-SNE plot for visualizing protein data."""
-        # Ensure that the protein data and annotation info have been loaded
+
+        # Ensure protein data and annotation info are loaded
         if self.protein_data is None or self.annotation_info is None:
             raise ValueError("Protein data or annotation info not loaded.")
 
         if self.protein_data_for_pca is None:
-            self.preprocess_for_pca()  # Reusing preprocessing from PCA
+            self.preprocess_for_pca()
 
         df = self.protein_data_for_pca
-        
-        n_samples = df.T.shape[0]  # Number of samples
-    
-        # Adjust the perplexity if it's higher than n_samples - 1
+        n_samples = df.T.shape[0]
+
+        # Adjust perplexity if necessary
         if perplexity >= n_samples:
             perplexity = max(5, n_samples // 2)
-        
+
         # Standardize the data
         scaler = StandardScaler()
         scaled_data = scaler.fit_transform(df.T)
-        
+
         # Perform t-SNE
         tsne = TSNE(n_components=n_components, perplexity=perplexity, random_state=42)
         tsne_components = tsne.fit_transform(scaled_data)
         tsne_df = pd.DataFrame(data=tsne_components, columns=[f'TSNE{i+1}' for i in range(n_components)])
-        
-        # Step 3: Merge annotation information
         tsne_df = pd.concat([tsne_df, self.annotation_info.reset_index()], axis=1)
-        
-        # Step 4: Create t-SNE plot colored by annotations
+
+        # Use colors from the config
+        color_discrete_map = config["colors"]
+
+        # Create t-SNE plot
         fig = px.scatter(
             tsne_df,
-            x='TSNE1',
-            y='TSNE2',
+            x="TSNE1",
+            y="TSNE2",
             color=group_column,
-            hover_data=['SampleName'],
-            title=f't-SNE Plot - Colored by {group_column}',
-            labels={group_column: 'Groups'},
-            text='SampleName'
+            hover_data=["SampleName"],
+            title=config["title"],
+            labels={group_column: "Groups"},
+            color_discrete_map=color_discrete_map,
+            text="SampleName" if config["show_labels"] else None,  # Toggle sample labels
         )
-        
-        # Dynamically adjust the axis scale and the labels positioning
-        fig.update_traces(textposition='top center')
-        
+
+        # Customize layout
+        fig.update_traces(marker=dict(size=config["marker_size"]))
         fig.update_layout(
-            xaxis_title='t-SNE Component 1',
-            yaxis_title='t-SNE Component 2',
-            width=800,
-            height=600,
-            margin=dict(l=0, r=0, t=40, b=40),
-            showlegend=True,
+            xaxis_title="t-SNE Component 1",
+            yaxis_title="t-SNE Component 2",
+            width=config["width"],
+            height=config["height"],
+            legend_title_text="Groups",
+            title_x=0.5,
+            title_font=dict(size=20),
+            font=dict(size=12),
+            margin=dict(l=0, r=0, t=60, b=40),
         )
-        
-        # Adjust marker size
-        fig.update_traces(marker=dict(size=8))
-        
+
         return fig
     
     def plot_intensity_density(self, config, color_discrete_map=None):

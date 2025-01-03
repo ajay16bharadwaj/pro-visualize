@@ -121,3 +121,20 @@ DEFAULT_SANKEY_CONFIG = {
     "title_font_size": 14,
     "title": "Sankey Diagram of Protein Transitions"
 }
+
+DEFAULT_UMAP_CONFIG = {
+    "title": "UMAP Projection",
+    "marker_size": 10,
+    "width": 800,
+    "height": 600,
+    "colors": {},  # Dynamically populated from global config
+}
+
+DEFAULT_TSNE_CONFIG = {
+    "title": "t-SNE Projection",
+    "marker_size": 8,
+    "width": 800,
+    "height": 600,
+    "colors": {},  # Dynamically populated from global config
+    "show_labels": True,  # Toggle option for sample labels
+}

@@ -1,5 +1,5 @@
 from utils.decorators import validate_inputs, safe_tab_execution
-from config import DEFAULT_COL_DEPLABEL, DEFAULT_FDR_THRESHOLD, DEFAULT_LOG2FC_THRESHOLD, DEFAULT_PCA_BY_ANNOTATION_CONFIG 
+from config import DEFAULT_COL_DEPLABEL, DEFAULT_FDR_THRESHOLD, DEFAULT_LOG2FC_THRESHOLD, DEFAULT_PCA_BY_ANNOTATION_CONFIG, DEFAULT_UMAP_CONFIG, DEFAULT_TSNE_CONFIG  
 import streamlit as st
 import pandas as pd
 from utils.helpers import dataframe_with_selections
@@ -7,7 +7,7 @@ from utils.helpers import dataframe_with_selections
 #clustering plots - Tab Code. Need documentation for what the plot is? 
 #@safe_tab_execution("Clustering")
 @validate_inputs(protein_status=True, annotation_status=True)
-def render_clustering(vis, figures_dict, protein_status, annotation_status,global_config, **kwargs):
+def render_clustering(vis, figures_dict, protein_status, annotation_status, global_config, **kwargs):
     """Render clustering plots Tab and update figures_dict."""
     clust_tab1, clust_tab2, clust_tab3 = st.tabs(["PCA", "UMAP", "T-SNE"])
     with clust_tab1: 
@@ -122,11 +122,104 @@ def render_clustering(vis, figures_dict, protein_status, annotation_status,globa
 
     with clust_tab2:
         #st.write("will integrate umap here")
-        umap_plot = vis.plot_umap()
+        st.write("UMAP Plot")
+
+        # Initialize session state for UMAP config
+        if "umap_config" not in st.session_state:
+            st.session_state.umap_config = DEFAULT_UMAP_CONFIG.copy()
+            st.session_state.umap_config["colors"] = global_config["group_colors"].copy()
+
+        # Synchronize session state colors with global config
+        for group, color in global_config["group_colors"].items():
+            if group not in st.session_state.umap_config["colors"]:
+                st.session_state.umap_config["colors"][group] = color
+            elif st.session_state.umap_config["colors"][group] != color:
+                st.session_state.umap_config["colors"][group] = color
+
+        # Temporary UMAP config for user input
+        temp_config = st.session_state.umap_config.copy()
+
+        # Customization block
+        with st.expander("Customize UMAP Plot"):
+            temp_config["title"] = st.text_input(
+                "Plot Title", temp_config["title"], key="umap_title"
+            )
+            temp_config["marker_size"] = st.slider(
+                "Marker Size", 5, 20, temp_config["marker_size"], key="umap_marker_size"
+            )
+            temp_config["width"] = st.slider(
+                "Plot Width", 400, 1200, temp_config["width"], key="umap_width"
+            )
+            temp_config["height"] = st.slider(
+                "Plot Height", 400, 1200, temp_config["height"], key="umap_height"
+            )
+
+            # Apply and Reset buttons
+            apply_col, reset_col = st.columns([1, 1])
+            with apply_col:
+                if st.button("Apply Changes", key="umap_apply_changes"):
+                    st.session_state.umap_config = temp_config.copy()
+                    st.toast("UMAP plot configuration updated!", icon="✅")
+            with reset_col:
+                if st.button("Reset to Defaults", key="umap_reset_default"):
+                    st.session_state.umap_config = DEFAULT_UMAP_CONFIG.copy()
+                    st.session_state.umap_config["colors"] = global_config["group_colors"].copy()
+                    st.toast("UMAP plot configuration reset to defaults!", icon="🔄")
+
+        # Generate UMAP plot
+        umap_plot = vis.plot_umap(config=st.session_state.umap_config)
         st.plotly_chart(umap_plot, use_container_width=True)
 
     with clust_tab3:
-        tsne_plot = vis.plot_tsne()
+        st.write("t-SNE Plot")
+
+        # Initialize session state for t-SNE config
+        if "tsne_config" not in st.session_state:
+            st.session_state.tsne_config = DEFAULT_TSNE_CONFIG.copy()
+            st.session_state.tsne_config["colors"] = global_config["group_colors"].copy()
+
+        # Synchronize session state colors with global config
+        for group, color in global_config["group_colors"].items():
+            if group not in st.session_state.tsne_config["colors"]:
+                st.session_state.tsne_config["colors"][group] = color
+            elif st.session_state.tsne_config["colors"][group] != color:
+                st.session_state.tsne_config["colors"][group] = color
+
+        # Temporary t-SNE config for user input
+        temp_config = st.session_state.tsne_config.copy()
+
+        # Customization block
+        with st.expander("Customize t-SNE Plot"):
+            temp_config["title"] = st.text_input(
+                "Plot Title", temp_config["title"], key="tsne_title"
+            )
+            temp_config["marker_size"] = st.slider(
+                "Marker Size", 5, 20, temp_config["marker_size"], key="tsne_marker_size"
+            )
+            temp_config["width"] = st.slider(
+                "Plot Width", 400, 1200, temp_config["width"], key="tsne_width"
+            )
+            temp_config["height"] = st.slider(
+                "Plot Height", 400, 1200, temp_config["height"], key="tsne_height"
+            )
+            temp_config["show_labels"] = st.checkbox(
+                "Show Sample Labels", temp_config["show_labels"], key="tsne_show_labels"
+            )
+
+            # Apply and Reset buttons
+            apply_col, reset_col = st.columns([1, 1])
+            with apply_col:
+                if st.button("Apply Changes", key="tsne_apply_changes"):
+                    st.session_state.tsne_config = temp_config.copy()
+                    st.toast("t-SNE plot configuration updated!", icon="✅")
+            with reset_col:
+                if st.button("Reset to Defaults", key="tsne_reset_default"):
+                    st.session_state.tsne_config = DEFAULT_TSNE_CONFIG.copy()
+                    st.session_state.tsne_config["colors"] = global_config["group_colors"].copy()
+                    st.toast("t-SNE plot configuration reset to defaults!", icon="🔄")
+
+        # Generate t-SNE plot
+        tsne_plot = vis.plot_tsne(config=st.session_state.tsne_config)
         st.plotly_chart(tsne_plot, use_container_width=True)
     
     
