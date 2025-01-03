@@ -16,6 +16,7 @@ from requests.adapters import HTTPAdapter, Retry
 from venn import venn
 from gprofiler import GProfiler
 import seaborn as sns
+from upsetplot import UpSet, from_memberships
 
 class ProteinVisualization:
 
@@ -1435,4 +1436,141 @@ class ProteinVisualization:
 
         return fig
     
+    def plot_sankey(self, log2fc_threshold=0.6, fdr_threshold=0.05, scale_non_significant=0.3, filter_threshold=1, config=None):
+        """
+        Generates a Sankey plot for protein categorization across comparisons.
+        
+        Args:
+            log2fc_threshold (float): Threshold for log2 Fold Change.
+            fdr_threshold (float): Threshold for significance (FDR).
+            scale_non_significant (float): Scale factor for non-significant flows.
+            filter_threshold (int): Minimum count of proteins to include in the plot.
+            config (dict): Configuration for customizing the plot.
+        
+        Returns:
+            plotly.graph_objects.Figure: Sankey plot.
+        """
+        # Preprocess DEP data
+        condition_groups = self.volcano_preprocess(self.COL_DEPLABEL)
+        all_data = []
+        
+        for comparison, df in condition_groups.items():
+            df['Category'] = 'Non-significant'  # Default
+            df.loc[(df[self.COL_DEPSIGNIF] <= fdr_threshold) & (df['log2FC'] > log2fc_threshold), 'Category'] = 'Upregulated'
+            df.loc[(df[self.COL_DEPSIGNIF] <= fdr_threshold) & (df['log2FC'] < -log2fc_threshold), 'Category'] = 'Downregulated'
+            
+            counts = df['Category'].value_counts().reset_index()
+            counts.columns = ['Category', 'Count']
+            counts['Comparison'] = comparison
+            all_data.append(counts)
+
+        # Combine all comparisons
+        sankey_data = pd.concat(all_data)
+
+        # Prepare Sankey components
+        comparison_labels = sorted(sankey_data['Comparison'].unique())
+        category_labels = ["Upregulated", "Downregulated", "Non-significant"]
+        labels = comparison_labels + category_labels
+        label_to_index = {label: i for i, label in enumerate(labels)}
+
+        sankey_data['Source'] = sankey_data['Comparison'].map(label_to_index)
+        sankey_data['Target'] = sankey_data['Category'].map(label_to_index)
+
+        # Add colors for links
+        colors = config.get("colors", {
+            "Upregulated": "green",
+            "Downregulated": "red",
+            "Non-significant": "lightgray"
+        })
+        sankey_data['Color'] = sankey_data['Category'].map(colors)
+
+        # Scale down Non-significant links
+        sankey_data.loc[sankey_data['Category'] == "Non-significant", 'Count'] *= scale_non_significant
+
+        # Filter small flows
+        sankey_data = sankey_data[sankey_data['Count'] > filter_threshold]
+
+        # Add counts to comparison labels
+        label_counts = sankey_data.groupby('Comparison')['Count'].sum().to_dict()
+        labels = [
+            f"{label} (n={label_counts[label]:,.0f})" if label in label_counts else label 
+            for label in labels
+        ]
+
+        # Build Sankey plot
+        fig = go.Figure(go.Sankey(
+            node=dict(
+                pad=config.get("pad", 20),
+                thickness=config.get("thickness", 20),
+                line=dict(color="black", width=0.5),
+                label=labels
+            ),
+            link=dict(
+                source=sankey_data['Source'],
+                target=sankey_data['Target'],
+                value=sankey_data['Count'],
+                color=sankey_data['Color']
+            )
+        ))
+
+        # Update layout
+        fig.update_layout(
+            title_text=config.get("title", "Sankey Diagram of Protein Transitions"),
+            font_size=config.get("font_size", 12),
+            title_font_size=config.get("title_font_size", 14),
+            hovermode="x"
+        )
+
+        return fig
+    
+
+    def plot_upset(self, selected_groups=None):
+        """
+        Generates an UpSet plot to visualize intersections of proteins across comparison groups.
+
+        Args:
+            selected_groups (list, optional): List of groups (comparisons) to include in the plot.
+                If None, all groups are included.
+
+        Returns:
+            BytesIO: In-memory image of the UpSet plot (PNG format).
+        """
+        # Ensure DEP information is loaded
+        if self.dep_info is None:
+            raise ValueError("DEP information is not loaded.")
+
+        # Create a copy to ensure the original data is not modified
+        dep_copy = self.dep_info.copy()
+
+        # Filter groups if selected_groups is specified
+        if selected_groups is not None:
+            dep_copy = dep_copy[dep_copy['Label2'].isin(selected_groups)]
+
+        # Group proteins by comparisons
+        grouped = dep_copy.groupby('Label2')['Protein'].apply(set).to_dict()
+
+        # Create memberships (list of comparisons each protein belongs to)
+        all_proteins = set.union(*grouped.values())
+        memberships = []
+        for protein in all_proteins:
+            protein_membership = [
+                comparison for comparison, proteins in grouped.items() if protein in proteins
+            ]
+            memberships.append(protein_membership)
+
+        # Convert to UpSet data format
+        upset_data = from_memberships(memberships)
+
+        # Generate the UpSet plot
+        fig, ax = plt.subplots(figsize=(10, 6))
+        upset = UpSet(upset_data, subset_size='count', show_counts='%d')
+        upset.plot()
+
+        # Save the plot as an in-memory PNG
+        buf = BytesIO()
+        plt.savefig(buf, format="png", bbox_inches="tight")
+        buf.seek(0)
+        plt.close(fig)  # Close the figure to free memory
+
+        return buf
 

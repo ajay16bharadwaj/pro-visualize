@@ -106,3 +106,18 @@ DEFAULT_PCA_BY_ANNOTATION_CONFIG = {
     "width": 800,
     "height": 600,
 }
+
+DEFAULT_SANKEY_CONFIG = {
+    "colors": {
+        "Upregulated": "#00FF00",  # Green in hex
+        "Downregulated": "#FF0000",  # Red in hex
+        "Non-significant": "#D3D3D3"  # Light gray in hex
+    },
+    "pad": 20,
+    "thickness": 20,
+    "scale_non_significant": 0.3,
+    "filter_threshold": 1,
+    "font_size": 12,
+    "title_font_size": 14,
+    "title": "Sankey Diagram of Protein Transitions"
+}
