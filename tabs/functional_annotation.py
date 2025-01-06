@@ -5,6 +5,8 @@ import pandas as pd
 from io import BytesIO
 from utils.helpers import dataframe_with_selections
 from utils.streamlit_caching import cached_get_all_enrichment
+import networkx as nx
+from pyvis.network import Network
 
 #functional_annotation plots - Tab Code. Need documentation for what the plot is? 
 @safe_tab_execution("functional_annotation")
@@ -29,7 +31,7 @@ def render_functional_annotation(vis, figures_dict, analysis_status, protein_sta
     source_dict = None
 
     #getting the terms with this set of significant proteins. 
-    ea, go_cc, go_mf, go_bp, kegg = st.tabs(['Comprehensive Enrichment Analysis','GO Cellular Component Encrichment', 'GO Molecular Function', 'GO Biological Process', 'KEGG Biological Pathways'])
+    ea, go_cc, go_bp, go_mf, kegg, Network_Visualization = st.tabs(['Comprehensive Enrichment Analysis','GO Cellular Component Encrichment', 'GO Biological Process', 'GO Molecular Function', 'KEGG Biological Pathways', 'Network Visualization'])
 
     with ea:
         enrichment_df, source_dict =  cached_get_all_enrichment(vis, list(dep_list_df[DEFAULT_GENE_NAME_COLUMN]), organism_input)
@@ -37,253 +39,304 @@ def render_functional_annotation(vis, figures_dict, analysis_status, protein_sta
         st.plotly_chart(ea_manhattan_plot)
 
     with go_cc:
-        # Column split for table and plot display with a 70-30 ratio.
-        go_cc_col1, go_cc_col2 = st.columns([0.7, 0.3])
         if not enrichment_df.empty and source_dict is not None:
-            #cc_df = vis.get_go_enrichment(list(dep_list_df['Protein']), go_category="GO:CC", organism=organism_input)
             if "GO:CC" in list(source_dict.keys()):
-                cc_df = source_dict['GO:CC']
-                
-                if not cc_df.empty:
-                # Use a checkbox to allow users to select custom GO terms.
-                    with go_cc_col2:
-                        go_cc_custom_term_select = st.checkbox('Choose custom GO Terms', key='go_cc_custom_term_select')
-                        # Display a table for selecting custom GO terms if the checkbox is checked.
-                        if go_cc_custom_term_select:
-                            cc_selected_terms = dataframe_with_selections(cc_df, "go_cc_df_select")
-                            with st.expander("Your selection"):
-                                st.write(cc_selected_terms)
-                        else:
-                            cc_selected_terms = None
+                cc_df = source_dict["GO:CC"]
 
-                    # Display the plot in the left column.
-                    with go_cc_col1:
-                        if go_cc_custom_term_select and cc_selected_terms is not None and not cc_selected_terms.empty:
-                            # If custom terms are selected, plot based on the selected terms.
-                            filtered_fig_cc, filtered_ax_cc = vis.plot_go_dotplot(cc_selected_terms, category_name="Cellular Component")
+                if not cc_df.empty:
+                    # Display the GO:CC dot plot
+                    #st.subheader("GO:CC Dot Plot")
+
+                    # Initialize session state for selected terms if not already set
+                    if "cc_selected_terms" not in st.session_state:
+                        st.session_state.cc_selected_terms = pd.DataFrame()
+                    if "cc_selection_state" not in st.session_state:
+                        st.session_state.cc_selection_state = []  # Track selected row indices
+
+                    # Render the plot
+                    if st.session_state.cc_selected_terms.empty:
+                        # Default plot with top 10 GO terms
+                        fig_cc, ax_cc = vis.plot_go_dotplot(
+                            cc_df.sort_values(by="q_value").head(10),
+                            category_name="Cellular Component"
+                        )
+                        fig_cc.set_size_inches(5, 3)  # Set fixed size: 500px width, 300px height
+                        st.pyplot(fig_cc)
+                    else:
+                        # Filter `cc_df` to include only the selected terms
+                        selected_native_ids = st.session_state.cc_selected_terms["native"].tolist()
+                        filtered_cc_df = cc_df[cc_df["native"].isin(selected_native_ids)]
+
+                        # Plot using the filtered DataFrame
+                        if not filtered_cc_df.empty:
+                            filtered_fig_cc, filtered_ax_cc = vis.plot_go_dotplot(
+                                filtered_cc_df, category_name="Cellular Component"
+                            )
+                            filtered_fig_cc.set_size_inches(5, 3)  # Set fixed size: 500px width, 300px height
                             st.pyplot(filtered_fig_cc)
                         else:
-                            # Default plot with the top 10 GO terms.
-                            fig_cc, ax_cc = vis.plot_go_dotplot(cc_df.sort_values(by='q_value').head(10), category_name="Cellular Component")
-                            st.pyplot(fig_cc)
+                            st.warning("No data available for the selected terms.")
 
-                    #protein information for go term
-                    st.write("Select the terms to view the Genes associated")
-                    cc_subset_for_selection = cc_df[['native', 'name', 'p_value', 'q_value', 'precision', 'recall','intersections']]
-                    cc_selected_terms_for_proteins = dataframe_with_selections(cc_subset_for_selection, "go_cc_protein_select")
-                    # Display the list of proteins associated with this term
-                    # if not cc_selected_terms_for_proteins.empty:
-                    #     st.subheader("Proteins Associated with Selected Term")
-                    #     protein_list = cc_selected_terms_for_proteins['intersections'].values[0]  # Access the list of proteins
-                    #     protein_df = pd.DataFrame(protein_list, columns=['Protein IDs'])
-                    #     st.dataframe(protein_df)
+                    # Display the selection table below the plot
+                    st.subheader("Select Custom GO Terms")
+                    cc_subset_for_selection = cc_df[
+                        ["native", "name", "p_value", "q_value", "precision", "recall", "intersections"]
+                    ]
 
-                    if not cc_selected_terms_for_proteins.empty:
-                        st.subheader("Genes Associated with Selected Terms")
-                        
-                        # Prepare data for column-by-column display
-                        proteins_dict = {}
-                        for _, row in cc_selected_terms_for_proteins.iterrows():
-                            term_name = row['name']  # Term name
-                            protein_list = row['intersections']  # List of proteins
-                            
-                            # Add to dictionary, term name as key, and protein list as value
-                            proteins_dict[term_name] = protein_list
-                        
-                        # Create a DataFrame with proteins column by column
-                        max_length = max(len(proteins) for proteins in proteins_dict.values())  # Get the maximum protein list length
-                        proteins_df = pd.DataFrame({term: pd.Series(proteins) for term, proteins in proteins_dict.items()}, index=range(max_length))
-                        
-                        # Display the resulting DataFrame
-                        st.dataframe(proteins_df)
+                    # Display the dataframe with selections
+                    cc_selected_terms = dataframe_with_selections(cc_subset_for_selection, "go_cc_subset_select")
+
+                    # Apply and Reset buttons
+                    apply_col, reset_col = st.columns([1, 1])
+                    with apply_col:
+                        if st.button("Apply Selection", key="cc_apply_selection"):
+                            if not cc_selected_terms.empty:
+                                st.session_state.cc_selected_terms = cc_selected_terms
+                                st.session_state.cc_selection_state = cc_selected_terms.index.tolist()  # Track selected rows
+                                st.toast("Selection applied. The plot has been updated!", icon="✅")
+
+                    with reset_col:
+                        if st.button("Reset Selection", key="cc_reset_selection"):
+                            # Clear selected terms and reset selection state
+                            st.session_state.cc_selected_terms = pd.DataFrame()
+                            st.session_state.cc_selection_state = []  # Clear the selection state
+                            st.toast("Selection reset. Showing default plot.", icon="🔄")
+
+
+
+                    
+    with go_bp:
+        if not enrichment_df.empty and source_dict is not None:
+            if "GO:BP" in list(source_dict.keys()):
+                bp_df = source_dict["GO:BP"]
+
+                if not bp_df.empty:
+                    # Initialize session state for selected terms if not already set
+                    if "bp_selected_terms" not in st.session_state:
+                        st.session_state.bp_selected_terms = pd.DataFrame()
+                    if "bp_selection_state" not in st.session_state:
+                        st.session_state.bp_selection_state = []
+
+                    # Render the plot
+                    if st.session_state.bp_selected_terms.empty:
+                        # Default plot with top 10 GO terms
+                        fig_bp, ax_bp = vis.plot_go_dotplot(
+                            bp_df.sort_values(by="q_value").head(10),
+                            category_name="Biological Process"
+                        )
+                        fig_bp.set_size_inches(5, 3)  # Set fixed size: 500px width, 300px height
+                        st.pyplot(fig_bp)
+                    else:
+                        # Filter `bp_df` to include only the selected terms
+                        selected_native_ids = st.session_state.bp_selected_terms["native"].tolist()
+                        filtered_bp_df = bp_df[bp_df["native"].isin(selected_native_ids)]
+
+                        # Plot using the filtered DataFrame
+                        if not filtered_bp_df.empty:
+                            filtered_fig_bp, filtered_ax_bp = vis.plot_go_dotplot(
+                                filtered_bp_df, category_name="Biological Process"
+                            )
+                            filtered_fig_bp.set_size_inches(5, 3)  # Set fixed size: 500px width, 300px height
+                            st.pyplot(filtered_fig_bp)
+                        else:
+                            st.warning("No data available for the selected terms.")
+
+                    # Display the selection table below the plot
+                    st.subheader("Select Custom GO Terms for Biological Process")
+                    bp_subset_for_selection = bp_df[
+                        ["native", "name", "p_value", "q_value", "precision", "recall", "intersections"]
+                    ]
+                    bp_selected_terms = dataframe_with_selections(bp_subset_for_selection, "go_bp_subset_select")
+
+                    # Apply and Reset buttons
+                    apply_col, reset_col = st.columns([1, 1])
+                    with apply_col:
+                        if st.button("Apply Selection", key="bp_apply_selection"):
+                            if not bp_selected_terms.empty:
+                                st.session_state.bp_selected_terms = bp_selected_terms
+                                st.session_state.bp_selection_state = bp_selected_terms.index.tolist()
+                                st.toast("Selection applied. The plot has been updated!", icon="✅")
+
+                    with reset_col:
+                        if st.button("Reset Selection", key="bp_reset_selection"):
+                            # Clear selected terms and reset selection state
+                            st.session_state.bp_selected_terms = pd.DataFrame()
+                            st.session_state.bp_selection_state = []
+                            st.toast("Selection reset. Showing default plot.", icon="🔄")
             else:
-                st.warning('No Cellular Componenets were found enriched for this comparison')
-                    
-        with go_mf:
-            go_mf_col1, go_mf_col2 = st.columns([0.7, 0.3])
-            if not enrichment_df.empty and source_dict is not None:
-                #mf_df = vis.get_go_enrichment(list(dep_list_df['Protein']), go_category="GO:MF", organism=organism_input)
-                if "GO:MF" in list(source_dict.keys()):
-                    mf_df = source_dict['GO:MF']
-                    
-                    if not mf_df.empty:
-                    # Use a checkbox to allow users to select custom GO terms.
-                        with go_mf_col2:
-                            go_mf_custom_term_select = st.checkbox('Choose custom GO Terms', key='go_mf_custom_term_select')
-                            # Display a table for selecting custom GO terms if the checkbox is checked.
-                            if go_mf_custom_term_select:
-                                mf_selected_terms = dataframe_with_selections(mf_df, "go_mf_df_select")
-                                with st.expander("Your selection"):
-                                    st.write(mf_selected_terms)
-                            else:
-                                mf_selected_terms = None
+                st.warning("No Biological Processes were found enriched in GO for this comparison.")
 
-                        # Display the plot in the left column.
-                        with go_mf_col1:
-                            if go_mf_custom_term_select and mf_selected_terms is not None and not mf_selected_terms.empty:
-                                # If custom terms are selected, plot based on the selected terms.
-                                filtered_fig_mf, filtered_ax_mf = vis.plot_go_dotplot(mf_selected_terms, category_name="Cellular Component")
-                                st.pyplot(filtered_fig_mf)
-                            else:
-                                # Default plot with the top 10 GO terms.
-                                fig_mf, ax_mf = vis.plot_go_dotplot(mf_df.sort_values(by='q_value').head(10), category_name="Cellular Component")
-                                st.pyplot(fig_mf)
-                        
-                        st.write("Select the terms to view the Genes associated")
-                        mf_subset_for_selection = mf_df[['native', 'name', 'p_value', 'q_value', 'precision', 'recall','intersections']]
-                        mf_selected_terms_for_proteins = dataframe_with_selections(mf_subset_for_selection, "go_mf_protein_select")
-                        # Display the list of proteins associated with this term
-                        # if not cc_selected_terms_for_proteins.empty:
-                        #     st.subheader("Proteins Associated with Selected Term")
-                        #     protein_list = cc_selected_terms_for_proteins['intersections'].values[0]  # Access the list of proteins
-                        #     protein_df = pd.DataFrame(protein_list, columns=['Protein IDs'])
-                        #     st.dataframe(protein_df)
+    with go_mf:
+        if not enrichment_df.empty and source_dict is not None:
+            if "GO:MF" in list(source_dict.keys()):
+                mf_df = source_dict["GO:MF"]
 
-                        if not mf_selected_terms_for_proteins.empty:
-                            st.subheader("Genes Associated with Selected Terms")
-                            
-                            # Prepare data for column-by-column display
-                            proteins_dict = {}
-                            for _, row in mf_selected_terms_for_proteins.iterrows():
-                                term_name = row['name']  # Term name
-                                protein_list = row['intersections']  # List of proteins
-                                
-                                # Add to dictionary, term name as key, and protein list as value
-                                proteins_dict[term_name] = protein_list
-                            
-                            # Create a DataFrame with proteins column by column
-                            max_length = max(len(proteins) for proteins in proteins_dict.values())  # Get the maximum protein list length
-                            proteins_df = pd.DataFrame({term: pd.Series(proteins) for term, proteins in proteins_dict.items()}, index=range(max_length))
-                            
-                            # Display the resulting DataFrame
-                            st.dataframe(proteins_df)
-                else:
-                    st.warning("No Molecular Functions were found enriched with these set of Differentially Expressed Proteins")
+                if not mf_df.empty:
+                    # Initialize session state for selected terms if not already set
+                    if "mf_selected_terms" not in st.session_state:
+                        st.session_state.mf_selected_terms = pd.DataFrame()
+                    if "mf_selection_state" not in st.session_state:
+                        st.session_state.mf_selection_state = []
 
-        with go_bp:
-            go_bp_col1, go_bp_col2 = st.columns([0.7, 0.3])
-            if not enrichment_df.empty and source_dict is not None:
-                #bp_df = vis.get_go_enrichment(list(dep_list_df['Protein']), go_category="GO:BP", organism=organism_input)
-                if "GO:BP" in list(source_dict.keys()):
-                    bp_df = source_dict['GO:BP']
-                    
-                    if not bp_df.empty:
-                    # Use a checkbox to allow users to select custom GO terms.
-                        with go_bp_col2:
-                            go_bp_custom_term_select = st.checkbox('Choose custom GO Terms', key='go_bp_custom_term_select')
-                            # Display a table for selecting custom GO terms if the checkbox is checked.
-                            if go_bp_custom_term_select:
-                                bp_selected_terms = dataframe_with_selections(bp_df, "go_bp_df_select")
-                                with st.expander("Your selection"):
-                                    st.write(bp_selected_terms)
-                            else:
-                                bp_selected_terms = None
+                    # Render the plot
+                    if st.session_state.mf_selected_terms.empty:
+                        # Default plot with top 10 GO terms
+                        fig_mf, ax_mf = vis.plot_go_dotplot(
+                            mf_df.sort_values(by="q_value").head(10),
+                            category_name="Molecular Function"
+                        )
+                        fig_mf.set_size_inches(5, 3)  # Set fixed size: 500px width, 300px height
+                        st.pyplot(fig_mf)
+                    else:
+                        # Filter `mf_df` to include only the selected terms
+                        selected_native_ids = st.session_state.mf_selected_terms["native"].tolist()
+                        filtered_mf_df = mf_df[mf_df["native"].isin(selected_native_ids)]
 
-                        # Display the plot in the left column.
-                        with go_bp_col1:
-                            if go_bp_custom_term_select and bp_selected_terms is not None and not bp_selected_terms.empty:
-                                # If custom terms are selected, plot based on the selected terms.
-                                filtered_fig_bp, filtered_ax_bp = vis.plot_go_dotplot(bp_selected_terms, category_name="Cellular Component")
-                                st.pyplot(filtered_fig_bp)
-                            else:
-                                # Default plot with the top 10 GO terms.
-                                fig_bp, ax_bp = vis.plot_go_dotplot(bp_df.sort_values(by='q_value').head(10), category_name="Cellular Component")
-                                st.pyplot(fig_bp)
+                        # Plot using the filtered DataFrame
+                        if not filtered_mf_df.empty:
+                            filtered_fig_mf, filtered_ax_mf = vis.plot_go_dotplot(
+                                filtered_mf_df, category_name="Molecular Function"
+                            )
+                            filtered_fig_mf.set_size_inches(5, 3)  # Set fixed size: 500px width, 300px height
+                            st.pyplot(filtered_fig_mf)
+                        else:
+                            st.warning("No data available for the selected terms.")
 
-                        st.write("Select the terms to view the Genes associated")
-                        bp_subset_for_selection = bp_df[['native', 'name', 'p_value', 'q_value', 'precision', 'recall','intersections']]
-                        bp_selected_terms_for_proteins = dataframe_with_selections(bp_subset_for_selection, "go_bp_protein_select")
-                        # Display the list of proteins associated with this term
-                        # if not cc_selected_terms_for_proteins.empty:
-                        #     st.subheader("Proteins Associated with Selected Term")
-                        #     protein_list = cc_selected_terms_for_proteins['intersections'].values[0]  # Access the list of proteins
-                        #     protein_df = pd.DataFrame(protein_list, columns=['Protein IDs'])
-                        #     st.dataframe(protein_df)
+                    # Display the selection table below the plot
+                    st.subheader("Select Custom GO Terms for Molecular Function")
+                    mf_subset_for_selection = mf_df[
+                        ["native", "name", "p_value", "q_value", "precision", "recall", "intersections"]
+                    ]
+                    mf_selected_terms = dataframe_with_selections(mf_subset_for_selection, "go_mf_subset_select")
 
-                        if not bp_selected_terms_for_proteins.empty:
-                            st.subheader("Genes Associated with Selected Terms")
-                            
-                            # Prepare data for column-by-column display
-                            proteins_dict = {}
-                            for _, row in bp_selected_terms_for_proteins.iterrows():
-                                term_name = row['name']  # Term name
-                                protein_list = row['intersections']  # List of proteins
-                                
-                                # Add to dictionary, term name as key, and protein list as value
-                                proteins_dict[term_name] = protein_list
-                            
-                            # Create a DataFrame with proteins column by column
-                            max_length = max(len(proteins) for proteins in proteins_dict.values())  # Get the maximum protein list length
-                            proteins_df = pd.DataFrame({term: pd.Series(proteins) for term, proteins in proteins_dict.items()}, index=range(max_length))
-                            
-                            # Display the resulting DataFrame
-                            st.dataframe(proteins_df)
-                else: 
-                    st.warning("No Biological Processes were found enriched in GO for these set of Proteins selected")
+                    # Apply and Reset buttons
+                    apply_col, reset_col = st.columns([1, 1])
+                    with apply_col:
+                        if st.button("Apply Selection", key="mf_apply_selection"):
+                            if not mf_selected_terms.empty:
+                                st.session_state.mf_selected_terms = mf_selected_terms
+                                st.session_state.mf_selection_state = mf_selected_terms.index.tolist()
+                                st.toast("Selection applied. The plot has been updated!", icon="✅")
 
-            
-        with kegg:
-            kegg_col1, kegg_col2 = st.columns([0.7, 0.3])
-            if not enrichment_df.empty and source_dict is not None:
-                #kegg_df = vis.get_go_enrichment(list(dep_list_df['Protein']), go_category="GO:kegg", organism=organism_input)
-                #print("source_dict: ", source_dict.keys())
-                if "KEGG" in list(source_dict.keys()):
-                    kegg_df = source_dict['KEGG']
-
-                    if not kegg_df.empty:
-                    
-                        # Use a checkbox to allow users to select custom GO terms.
-                        with kegg_col2:
-                            kegg_custom_term_select = st.checkbox('Choose custom GO Terms', key='kegg_custom_term_select')
-                            # Display a table for selecting custom GO terms if the checkbox is checked.
-                            if kegg_custom_term_select:
-                                kegg_selected_terms = dataframe_with_selections(kegg_df, "kegg_df_select")
-                                with st.expander("Your selection"):
-                                    st.write(kegg_selected_terms)
-                            else:
-                                kegg_selected_terms = None
-
-                        # Display the plot in the left column.
-                        with kegg_col1:
-                            if kegg_custom_term_select and kegg_selected_terms is not None and not kegg_selected_terms.empty:
-                                # If custom terms are selected, plot based on the selected terms.
-                                filtered_fig_kegg, filtered_ax_kegg = vis.plot_go_dotplot(kegg_selected_terms, category_name="Cellular Component")
-                                st.pyplot(filtered_fig_kegg)
-                            else:
-                                # Default plot with the top 10 GO terms.
-                                fig_kegg, ax_kegg = vis.plot_go_dotplot(kegg_df.sort_values(by='q_value').head(10), category_name="Cellular Component")
-                                st.pyplot(fig_kegg)
-
-                        st.write("Select the terms to view the Genes associated")
-                        kegg_subset_for_selection = kegg_df[['native', 'name', 'p_value', 'q_value', 'precision', 'recall','intersections']]
-                        kegg_selected_terms_for_proteins = dataframe_with_selections(kegg_subset_for_selection, "go_kegg_protein_select")
-                        # Display the list of proteins associated with this term
-                        # if not cc_selected_terms_for_proteins.empty:
-                        #     st.subheader("Proteins Associated with Selected Term")
-                        #     protein_list = cc_selected_terms_for_proteins['intersections'].values[0]  # Access the list of proteins
-                        #     protein_df = pd.DataFrame(protein_list, columns=['Protein IDs'])
-                        #     st.dataframe(protein_df)
-
-                        if not kegg_selected_terms_for_proteins.empty:
-                            st.subheader("Genes Associated with Selected Terms")
-                            
-                            # Prepare data for column-by-column display
-                            proteins_dict = {}
-                            for _, row in kegg_selected_terms_for_proteins.iterrows():
-                                term_name = row['name']  # Term name
-                                protein_list = row['intersections']  # List of proteins
-                                
-                                # Add to dictionary, term name as key, and protein list as value
-                                proteins_dict[term_name] = protein_list
-                            
-                            # Create a DataFrame with proteins column by column
-                            max_length = max(len(proteins) for proteins in proteins_dict.values())  # Get the maximum protein list length
-                            proteins_df = pd.DataFrame({term: pd.Series(proteins) for term, proteins in proteins_dict.items()}, index=range(max_length))
-                            
-                            # Display the resulting DataFrame
-                            st.dataframe(proteins_df)
-                else:
-                    st.warning("No KEGG pathways were enriched for this set of Differentially Expressed proteins")
+                    with reset_col:
+                        if st.button("Reset Selection", key="mf_reset_selection"):
+                            # Clear selected terms and reset selection state
+                            st.session_state.mf_selected_terms = pd.DataFrame()
+                            st.session_state.mf_selection_state = []
+                            st.toast("Selection reset. Showing default plot.", icon="🔄")
             else:
-                st.warning("Enrichment analysis data is not available or no pathways were identified")
+                st.warning("No Molecular Functions were found enriched for this comparison.")
+
+    with kegg:
+        if not enrichment_df.empty and source_dict is not None:
+            if "KEGG" in list(source_dict.keys()):
+                kegg_df = source_dict["KEGG"]
+
+                if not kegg_df.empty:
+                    # Initialize session state for selected terms if not already set
+                    if "kegg_selected_terms" not in st.session_state:
+                        st.session_state.kegg_selected_terms = pd.DataFrame()
+                    if "kegg_selection_state" not in st.session_state:
+                        st.session_state.kegg_selection_state = []
+
+                    # Render the plot
+                    if st.session_state.kegg_selected_terms.empty:
+                        # Default plot with top 10 KEGG pathways
+                        fig_kegg, ax_kegg = vis.plot_go_dotplot(
+                            kegg_df.sort_values(by="q_value").head(10),
+                            category_name="KEGG Pathways"
+                        )
+                        fig_kegg.set_size_inches(5, 3)  # Set fixed size: 500px width, 300px height
+                        st.pyplot(fig_kegg)
+                    else:
+                        # Filter `kegg_df` to include only the selected terms
+                        selected_native_ids = st.session_state.kegg_selected_terms["native"].tolist()
+                        filtered_kegg_df = kegg_df[kegg_df["native"].isin(selected_native_ids)]
+
+                        # Plot using the filtered DataFrame
+                        if not filtered_kegg_df.empty:
+                            filtered_fig_kegg, filtered_ax_kegg = vis.plot_go_dotplot(
+                                filtered_kegg_df, category_name="KEGG Pathways"
+                            )
+                            filtered_fig_kegg.set_size_inches(5, 3)  # Set fixed size: 500px width, 300px height
+                            st.pyplot(filtered_fig_kegg)
+                        else:
+                            st.warning("No data available for the selected terms.")
+
+                    # Display the selection table below the plot
+                    st.subheader("Select Custom KEGG Pathways")
+                    kegg_subset_for_selection = kegg_df[
+                        ["native", "name", "p_value", "q_value", "precision", "recall", "intersections"]
+                    ]
+                    kegg_selected_terms = dataframe_with_selections(kegg_subset_for_selection, "kegg_subset_select")
+
+                    # Apply and Reset buttons
+                    apply_col, reset_col = st.columns([1, 1])
+                    with apply_col:
+                        if st.button("Apply Selection", key="kegg_apply_selection"):
+                            if not kegg_selected_terms.empty:
+                                st.session_state.kegg_selected_terms = kegg_selected_terms
+                                st.session_state.kegg_selection_state = kegg_selected_terms.index.tolist()
+                                st.toast("Selection applied. The plot has been updated!", icon="✅")
+
+                    with reset_col:
+                        if st.button("Reset Selection", key="kegg_reset_selection"):
+                            # Clear selected terms and reset selection state
+                            st.session_state.kegg_selected_terms = pd.DataFrame()
+                            st.session_state.kegg_selection_state = []
+                            st.toast("Selection reset. Showing default plot.", icon="🔄")
+            else:
+                st.warning("No KEGG pathways were enriched for this comparison.")
+        else:
+            st.warning("Enrichment analysis data is not available or no pathways were identified")
     
+    with Network_Visualization:
+        st.subheader("Protein-GO-KEGG Network Visualization")
+    
+        # Protein selection
+        selected_proteins = st.multiselect(
+            "Select Proteins to Display",
+            options=dep_list_df["Protein"].tolist(),
+            default=dep_list_df["Protein"].head(10).tolist(),
+            help="Choose specific proteins to include in the network."
+        )
+        
+        # GO term filtering
+        go_categories = ["GO:CC", "GO:BP", "GO:MF"]
+        selected_go_categories = st.multiselect(
+            "Select GO Categories",
+            options=go_categories,
+            default=go_categories,
+            help="Choose which GO categories to include in the network."
+        )
+        
+        # KEGG pathway filtering
+        display_kegg = st.checkbox("Include KEGG Pathways", value=True)
+
+        # Threshold filtering
+        p_value_threshold = st.slider(
+            "P-value Threshold for Terms",
+            min_value=0.0,
+            max_value=1.0,
+            value=0.05,
+            step=0.01,
+            help="Filter GO terms and KEGG pathways by significance."
+        )
+
+        # Generate network based on filters
+        filtered_source_dict = {
+            key: val[val["p_value"] <= p_value_threshold]
+            for key, val in source_dict.items()
+            if key in selected_go_categories and not val.empty
+        }
+        filtered_kegg = kegg_df[kegg_df["p_value"] <= p_value_threshold] if display_kegg else pd.DataFrame()
+
+        # Generate the network graph
+        network_graph = vis.generate_network_graph(
+            dep_list=dep_list_df[dep_list_df["Protein"].isin(selected_proteins)],
+            go_terms=filtered_source_dict,
+            kegg_terms=filtered_kegg
+        )
+        
+        # Render the graph
+        st.components.v1.html(network_graph, height=600)

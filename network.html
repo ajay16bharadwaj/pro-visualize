@@ -1,0 +1,250 @@
+<html>
+    <head>
+        <meta charset="utf-8">
+        
+            <script src="lib/bindings/utils.js"></script>
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/dist/vis-network.min.css" integrity="sha512-WgxfT5LWjfszlPHXRmBWHkV2eceiWTOBvrKCNbdgDYTHrT2AeLCGbF4sZlZw3UMN3WtL0tGUoIAKsu8mllg/XA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/vis-network.min.js" integrity="sha512-LnvoEWDFrqGHlHmDD2101OrLcbsfkrzoSpvtSQtxK3RMnRV0eOkhhBN2dXHKRrUU8p2DGRTk35n4O8nWSVe1mQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+            
+        
+<center>
+<h1></h1>
+</center>
+
+<!-- <link rel="stylesheet" href="../node_modules/vis/dist/vis.min.css" type="text/css" />
+<script type="text/javascript" src="../node_modules/vis/dist/vis.js"> </script>-->
+        <link
+          href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/css/bootstrap.min.css"
+          rel="stylesheet"
+          integrity="sha384-eOJMYsd53ii+scO/bJGFsiCZc+5NDVN2yr8+0RDqr0Ql0h+rP48ckxlpbzKgwra6"
+          crossorigin="anonymous"
+        />
+        <script
+          src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/js/bootstrap.bundle.min.js"
+          integrity="sha384-JEW9xMcG8R+pH31jmWH6WWP0WintQrMb4s7ZOdauHnUtxwoG2vI5DkLtS3qm9Ekf"
+          crossorigin="anonymous"
+        ></script>
+
+
+        <center>
+          <h1></h1>
+        </center>
+        <style type="text/css">
+
+             #mynetwork {
+                 width: 100%;
+                 height: 750px;
+                 background-color: #222222;
+                 border: 1px solid lightgray;
+                 position: relative;
+                 float: left;
+             }
+
+             
+             #loadingBar {
+                 position:absolute;
+                 top:0px;
+                 left:0px;
+                 width: 100%;
+                 height: 750px;
+                 background-color:rgba(200,200,200,0.8);
+                 -webkit-transition: all 0.5s ease;
+                 -moz-transition: all 0.5s ease;
+                 -ms-transition: all 0.5s ease;
+                 -o-transition: all 0.5s ease;
+                 transition: all 0.5s ease;
+                 opacity:1;
+             }
+
+             #bar {
+                 position:absolute;
+                 top:0px;
+                 left:0px;
+                 width:20px;
+                 height:20px;
+                 margin:auto auto auto auto;
+                 border-radius:11px;
+                 border:2px solid rgba(30,30,30,0.05);
+                 background: rgb(0, 173, 246); /* Old browsers */
+                 box-shadow: 2px 0px 4px rgba(0,0,0,0.4);
+             }
+
+             #border {
+                 position:absolute;
+                 top:10px;
+                 left:10px;
+                 width:500px;
+                 height:23px;
+                 margin:auto auto auto auto;
+                 box-shadow: 0px 0px 4px rgba(0,0,0,0.2);
+                 border-radius:10px;
+             }
+
+             #text {
+                 position:absolute;
+                 top:8px;
+                 left:530px;
+                 width:30px;
+                 height:50px;
+                 margin:auto auto auto auto;
+                 font-size:22px;
+                 color: #000000;
+             }
+
+             div.outerBorder {
+                 position:relative;
+                 top:400px;
+                 width:600px;
+                 height:44px;
+                 margin:auto auto auto auto;
+                 border:8px solid rgba(0,0,0,0.1);
+                 background: rgb(252,252,252); /* Old browsers */
+                 background: -moz-linear-gradient(top,  rgba(252,252,252,1) 0%, rgba(237,237,237,1) 100%); /* FF3.6+ */
+                 background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,rgba(252,252,252,1)), color-stop(100%,rgba(237,237,237,1))); /* Chrome,Safari4+ */
+                 background: -webkit-linear-gradient(top,  rgba(252,252,252,1) 0%,rgba(237,237,237,1) 100%); /* Chrome10+,Safari5.1+ */
+                 background: -o-linear-gradient(top,  rgba(252,252,252,1) 0%,rgba(237,237,237,1) 100%); /* Opera 11.10+ */
+                 background: -ms-linear-gradient(top,  rgba(252,252,252,1) 0%,rgba(237,237,237,1) 100%); /* IE10+ */
+                 background: linear-gradient(to bottom,  rgba(252,252,252,1) 0%,rgba(237,237,237,1) 100%); /* W3C */
+                 filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#fcfcfc', endColorstr='#ededed',GradientType=0 ); /* IE6-9 */
+                 border-radius:72px;
+                 box-shadow: 0px 0px 10px rgba(0,0,0,0.2);
+             }
+             
+
+             
+
+             
+        </style>
+    </head>
+
+
+    <body>
+        <div class="card" style="width: 100%">
+            
+            
+            <div id="mynetwork" class="card-body"></div>
+        </div>
+
+        
+            <div id="loadingBar">
+              <div class="outerBorder">
+                <div id="text">0%</div>
+                <div id="border">
+                  <div id="bar"></div>
+                </div>
+              </div>
+            </div>
+        
+        
+
+        <script type="text/javascript">
+
+              // initialize global variables.
+              var edges;
+              var nodes;
+              var allNodes;
+              var allEdges;
+              var nodeColors;
+              var originalNodes;
+              var network;
+              var container;
+              var options, data;
+              var filter = {
+                  item : '',
+                  property : '',
+                  value : []
+              };
+
+              
+
+              
+
+              // This method is responsible for drawing the graph, returns the drawn network
+              function drawGraph() {
+                  var container = document.getElementById('mynetwork');
+
+                  
+
+                  // parsing and collecting nodes and edges from the python
+                  nodes = new vis.DataSet([{"font": {"color": "white"}, "group": "Protein", "id": "A3KN83", "label": "A3KN83", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "A6NHX0", "label": "A6NHX0", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "B3KNS4", "label": "B3KNS4", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "O00400", "label": "O00400", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "O14791", "label": "O14791", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "O14879", "label": "O14879", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "O14933", "label": "O14933", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "O15162", "label": "O15162", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "O15318", "label": "O15318", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "O15321", "label": "O15321", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "O15533", "label": "O15533", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "O60566", "label": "O60566", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "O75925", "label": "O75925", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "O94762", "label": "O94762", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "O94885", "label": "O94885", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "O95183", "label": "O95183", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "O95786", "label": "O95786", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "P00973", "label": "P00973", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "P09038", "label": "P09038", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "P09543", "label": "P09543", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "P09913", "label": "P09913", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "P10109", "label": "P10109", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "P11169", "label": "P11169", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "P13051", "label": "P13051", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "P19474", "label": "P19474", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "P19525", "label": "P19525", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "P20592", "label": "P20592", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "P23381", "label": "P23381", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "P23497", "label": "P23497", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "P27487", "label": "P27487", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "P27540", "label": "P27540", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "P28065", "label": "P28065", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "P28838", "label": "P28838", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "P29558", "label": "P29558", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "P29590", "label": "P29590", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "P30511", "label": "P30511", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "P32455", "label": "P32455", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "P36897", "label": "P36897", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "P36959", "label": "P36959", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "P51003", "label": "P51003", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "P55265", "label": "P55265", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "P57764", "label": "P57764", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "P61018", "label": "P61018", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "P61587", "label": "P61587", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "P68543", "label": "P68543", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "P80217", "label": "P80217", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q00978", "label": "Q00978", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q08117", "label": "Q08117", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q08380", "label": "Q08380", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q08722", "label": "Q08722", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q08AD1", "label": "Q08AD1", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q12968", "label": "Q12968", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q13287", "label": "Q13287", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q13325", "label": "Q13325", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q14142", "label": "Q14142", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q14258", "label": "Q14258", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q14393", "label": "Q14393", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q14CB8", "label": "Q14CB8", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q15155", "label": "Q15155", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q16512", "label": "Q16512", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q16666", "label": "Q16666", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q17R31", "label": "Q17R31", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q2KHR3", "label": "Q2KHR3", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q3KRA6", "label": "Q3KRA6", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q53G44", "label": "Q53G44", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q5TEJ8", "label": "Q5TEJ8", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q5XPI4", "label": "Q5XPI4", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q6P1L5", "label": "Q6P1L5", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q6P3R8", "label": "Q6P3R8", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q6PRD1", "label": "Q6PRD1", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q6ZMK1", "label": "Q6ZMK1", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q7RTN6", "label": "Q7RTN6", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q7Z2W4", "label": "Q7Z2W4", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q7Z309", "label": "Q7Z309", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q7Z6J0", "label": "Q7Z6J0", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q7Z7A3", "label": "Q7Z7A3", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q86X53", "label": "Q86X53", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q86X95", "label": "Q86X95", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q8IVH8", "label": "Q8IVH8", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q8IVU3", "label": "Q8IVU3", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q8IXQ6", "label": "Q8IXQ6", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q8IY21", "label": "Q8IY21", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q8IYM9", "label": "Q8IYM9", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q8NC54", "label": "Q8NC54", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q8NEU8", "label": "Q8NEU8", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q8NEZ3", "label": "Q8NEZ3", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q8NFM4", "label": "Q8NFM4", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q8TCS8", "label": "Q8TCS8", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q8TDB6", "label": "Q8TDB6", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q8TEQ8", "label": "Q8TEQ8", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q8WTW3", "label": "Q8WTW3", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q8WUJ3", "label": "Q8WUJ3", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q969S2", "label": "Q969S2", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q96AX9", "label": "Q96AX9", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q96G97", "label": "Q96G97", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q96NB2", "label": "Q96NB2", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q96S21", "label": "Q96S21", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q96SF7", "label": "Q96SF7", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q99523", "label": "Q99523", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q99759", "label": "Q99759", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q9BQE9", "label": "Q9BQE9", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q9BVG8", "label": "Q9BVG8", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q9BWT3", "label": "Q9BWT3", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q9BWW4", "label": "Q9BWW4", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q9BYK8", "label": "Q9BYK8", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q9BYM8", "label": "Q9BYM8", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q9BYX4", "label": "Q9BYX4", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q9H300", "label": "Q9H300", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q9HB58", "label": "Q9HB58", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q9HC16", "label": "Q9HC16", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q9NR09", "label": "Q9NR09", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q9NRX6", "label": "Q9NRX6", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q9NS87", "label": "Q9NS87", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q9NUP1", "label": "Q9NUP1", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q9NUQ6", "label": "Q9NUQ6", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q9NZJ4", "label": "Q9NZJ4", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q9NZT2", "label": "Q9NZT2", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q9P2W9", "label": "Q9P2W9", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q9UBN6", "label": "Q9UBN6", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q9UII4", "label": "Q9UII4", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q9UIM3", "label": "Q9UIM3", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q9UK97", "label": "Q9UK97", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q9ULE4", "label": "Q9ULE4", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q9ULQ0", "label": "Q9ULQ0", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q9Y2X7", "label": "Q9Y2X7", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q9Y485", "label": "Q9Y485", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "Protein", "id": "Q9Y6K5", "label": "Q9Y6K5", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "CC", "id": "CC: cytoplasm", "label": "CC: cytoplasm", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "CC", "id": "CC: cytosol", "label": "CC: cytosol", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "CC", "id": "CC: intracellular anatomical structure", "label": "CC: intracellular anatomical structure", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: defense response to virus", "label": "BP: defense response to virus", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: response to virus", "label": "BP: response to virus", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: innate immune response", "label": "BP: innate immune response", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: defense response to symbiont", "label": "BP: defense response to symbiont", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: defense response to other organism", "label": "BP: defense response to other organism", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: response to other organism", "label": "BP: response to other organism", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: response to external biotic stimulus", "label": "BP: response to external biotic stimulus", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: biological process involved in interspecies interaction between organisms", "label": "BP: biological process involved in interspecies interaction between organisms", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: response to biotic stimulus", "label": "BP: response to biotic stimulus", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: defense response", "label": "BP: defense response", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: regulation of response to biotic stimulus", "label": "BP: regulation of response to biotic stimulus", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: negative regulation of viral process", "label": "BP: negative regulation of viral process", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: regulation of defense response", "label": "BP: regulation of defense response", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: regulation of response to external stimulus", "label": "BP: regulation of response to external stimulus", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: regulation of viral process", "label": "BP: regulation of viral process", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: immune system process", "label": "BP: immune system process", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: response to external stimulus", "label": "BP: response to external stimulus", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: immune response", "label": "BP: immune response", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: response to stress", "label": "BP: response to stress", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: regulation of viral life cycle", "label": "BP: regulation of viral life cycle", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: regulation of innate immune response", "label": "BP: regulation of innate immune response", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: positive regulation of response to external stimulus", "label": "BP: positive regulation of response to external stimulus", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: negative regulation of viral genome replication", "label": "BP: negative regulation of viral genome replication", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: positive regulation of response to biotic stimulus", "label": "BP: positive regulation of response to biotic stimulus", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: viral process", "label": "BP: viral process", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: regulation of response to stress", "label": "BP: regulation of response to stress", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: regulation of viral genome replication", "label": "BP: regulation of viral genome replication", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: protein modification by small protein conjugation", "label": "BP: protein modification by small protein conjugation", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: positive regulation of innate immune response", "label": "BP: positive regulation of innate immune response", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: positive regulation of defense response", "label": "BP: positive regulation of defense response", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: viral genome replication", "label": "BP: viral genome replication", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: post-translational protein modification", "label": "BP: post-translational protein modification", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: viral life cycle", "label": "BP: viral life cycle", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: regulation of immune response", "label": "BP: regulation of immune response", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: protein modification by small protein conjugation or removal", "label": "BP: protein modification by small protein conjugation or removal", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: response to cytokine", "label": "BP: response to cytokine", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: positive regulation of immune response", "label": "BP: positive regulation of immune response", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: regulation of response to stimulus", "label": "BP: regulation of response to stimulus", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: activation of immune response", "label": "BP: activation of immune response", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: immune response-activating signaling pathway", "label": "BP: immune response-activating signaling pathway", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: response to stimulus", "label": "BP: response to stimulus", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: antiviral innate immune response", "label": "BP: antiviral innate immune response", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: immune response-regulating signaling pathway", "label": "BP: immune response-regulating signaling pathway", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: positive regulation of defense response to virus by host", "label": "BP: positive regulation of defense response to virus by host", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: regulation of interferon-beta production", "label": "BP: regulation of interferon-beta production", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: interferon-beta production", "label": "BP: interferon-beta production", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: positive regulation of response to stimulus", "label": "BP: positive regulation of response to stimulus", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: regulation of immune system process", "label": "BP: regulation of immune system process", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: regulation of cytokine production", "label": "BP: regulation of cytokine production", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: protein ubiquitination", "label": "BP: protein ubiquitination", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: activation of innate immune response", "label": "BP: activation of innate immune response", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: cytokine production", "label": "BP: cytokine production", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: positive regulation of immune system process", "label": "BP: positive regulation of immune system process", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: response to interferon-alpha", "label": "BP: response to interferon-alpha", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: regulation of defense response to virus", "label": "BP: regulation of defense response to virus", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: pattern recognition receptor signaling pathway", "label": "BP: pattern recognition receptor signaling pathway", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: positive regulation of interferon-beta production", "label": "BP: positive regulation of interferon-beta production", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: innate immune response-activating signaling pathway", "label": "BP: innate immune response-activating signaling pathway", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: regulation of defense response to virus by host", "label": "BP: regulation of defense response to virus by host", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: negative regulation of innate immune response", "label": "BP: negative regulation of innate immune response", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: macromolecule modification", "label": "BP: macromolecule modification", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: regulation of molecular function", "label": "BP: regulation of molecular function", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: type I interferon production", "label": "BP: type I interferon production", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: regulation of type I interferon production", "label": "BP: regulation of type I interferon production", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: regulation of response to cytokine stimulus", "label": "BP: regulation of response to cytokine stimulus", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: intracellular signal transduction", "label": "BP: intracellular signal transduction", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: intracellular receptor signaling pathway", "label": "BP: intracellular receptor signaling pathway", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: positive regulation of macromolecule metabolic process", "label": "BP: positive regulation of macromolecule metabolic process", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: biological regulation", "label": "BP: biological regulation", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: protein modification process", "label": "BP: protein modification process", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: positive regulation of metabolic process", "label": "BP: positive regulation of metabolic process", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: protein polyubiquitination", "label": "BP: protein polyubiquitination", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: cytoplasmic pattern recognition receptor signaling pathway", "label": "BP: cytoplasmic pattern recognition receptor signaling pathway", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: positive regulation of cellular process", "label": "BP: positive regulation of cellular process", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: negative regulation of biological process", "label": "BP: negative regulation of biological process", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: positive regulation of macromolecule biosynthetic process", "label": "BP: positive regulation of macromolecule biosynthetic process", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: negative regulation of response to biotic stimulus", "label": "BP: negative regulation of response to biotic stimulus", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: positive regulation of type I interferon production", "label": "BP: positive regulation of type I interferon production", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: regulation of signal transduction", "label": "BP: regulation of signal transduction", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: response to organic substance", "label": "BP: response to organic substance", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: signal transduction", "label": "BP: signal transduction", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: regulation of biological process", "label": "BP: regulation of biological process", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: positive regulation of cellular metabolic process", "label": "BP: positive regulation of cellular metabolic process", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: positive regulation of cellular biosynthetic process", "label": "BP: positive regulation of cellular biosynthetic process", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: positive regulation of biosynthetic process", "label": "BP: positive regulation of biosynthetic process", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: cellular response to stimulus", "label": "BP: cellular response to stimulus", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: programmed cell death", "label": "BP: programmed cell death", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: cell death", "label": "BP: cell death", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: positive regulation of biological process", "label": "BP: positive regulation of biological process", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: negative regulation of defense response", "label": "BP: negative regulation of defense response", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: cellular response to cytokine stimulus", "label": "BP: cellular response to cytokine stimulus", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: negative regulation of response to external stimulus", "label": "BP: negative regulation of response to external stimulus", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: cell communication", "label": "BP: cell communication", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: RIG-I signaling pathway", "label": "BP: RIG-I signaling pathway", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: positive regulation of canonical NF-kappaB signal transduction", "label": "BP: positive regulation of canonical NF-kappaB signal transduction", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: negative regulation of molecular function", "label": "BP: negative regulation of molecular function", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: positive regulation of non-canonical NF-kappaB signal transduction", "label": "BP: positive regulation of non-canonical NF-kappaB signal transduction", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: positive regulation of DNA-binding transcription factor activity", "label": "BP: positive regulation of DNA-binding transcription factor activity", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: signaling", "label": "BP: signaling", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: organonitrogen compound catabolic process", "label": "BP: organonitrogen compound catabolic process", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: regulation of Fc receptor mediated stimulatory signaling pathway", "label": "BP: regulation of Fc receptor mediated stimulatory signaling pathway", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: MDA-5 signaling pathway", "label": "BP: MDA-5 signaling pathway", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: interferon-mediated signaling pathway", "label": "BP: interferon-mediated signaling pathway", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: interferon-alpha production", "label": "BP: interferon-alpha production", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "BP", "id": "BP: regulation of interferon-alpha production", "label": "BP: regulation of interferon-alpha production", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "MF", "id": "MF: ubiquitin-like protein transferase activity", "label": "MF: ubiquitin-like protein transferase activity", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "MF", "id": "MF: aminoacyltransferase activity", "label": "MF: aminoacyltransferase activity", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "MF", "id": "MF: double-stranded RNA binding", "label": "MF: double-stranded RNA binding", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "MF", "id": "MF: ubiquitin-protein transferase activity", "label": "MF: ubiquitin-protein transferase activity", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "MF", "id": "MF: transferase activity", "label": "MF: transferase activity", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "MF", "id": "MF: catalytic activity", "label": "MF: catalytic activity", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "MF", "id": "MF: ubiquitin-like protein ligase activity", "label": "MF: ubiquitin-like protein ligase activity", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "MF", "id": "MF: nucleotidyltransferase activity", "label": "MF: nucleotidyltransferase activity", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "MF", "id": "MF: transcription coregulator activity", "label": "MF: transcription coregulator activity", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "MF", "id": "MF: protein binding", "label": "MF: protein binding", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "MF", "id": "MF: protein-macromolecule adaptor activity", "label": "MF: protein-macromolecule adaptor activity", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "MF", "id": "MF: molecular adaptor activity", "label": "MF: molecular adaptor activity", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "MF", "id": "MF: purine ribonucleoside triphosphate binding", "label": "MF: purine ribonucleoside triphosphate binding", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "MF", "id": "MF: purine ribonucleotide binding", "label": "MF: purine ribonucleotide binding", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "MF", "id": "MF: acyltransferase activity", "label": "MF: acyltransferase activity", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "MF", "id": "MF: ribonucleotide binding", "label": "MF: ribonucleotide binding", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "MF", "id": "MF: transcription coactivator activity", "label": "MF: transcription coactivator activity", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "MF", "id": "MF: carbohydrate derivative binding", "label": "MF: carbohydrate derivative binding", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "MF", "id": "MF: single-stranded RNA binding", "label": "MF: single-stranded RNA binding", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "MF", "id": "MF: purine nucleotide binding", "label": "MF: purine nucleotide binding", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "MF", "id": "MF: adenylyltransferase activity", "label": "MF: adenylyltransferase activity", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "MF", "id": "MF: nucleotide binding", "label": "MF: nucleotide binding", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "MF", "id": "MF: nucleoside phosphate binding", "label": "MF: nucleoside phosphate binding", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "MF", "id": "MF: heterocyclic compound binding", "label": "MF: heterocyclic compound binding", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "MF", "id": "MF: ubiquitin protein ligase activity", "label": "MF: ubiquitin protein ligase activity", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "MF", "id": "MF: transferase activity, transferring phosphorus-containing groups", "label": "MF: transferase activity, transferring phosphorus-containing groups", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "MF", "id": "MF: ATP binding", "label": "MF: ATP binding", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "MF", "id": "MF: anion binding", "label": "MF: anion binding", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "MF", "id": "MF: TAP2 binding", "label": "MF: TAP2 binding", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "MF", "id": "MF: 2\u0027-5\u0027-oligoadenylate synthetase activity", "label": "MF: 2\u0027-5\u0027-oligoadenylate synthetase activity", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "KEGG", "id": "KEGG: Influenza A", "label": "KEGG: Influenza A", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "KEGG", "id": "KEGG: Measles", "label": "KEGG: Measles", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "KEGG", "id": "KEGG: NOD-like receptor signaling pathway", "label": "KEGG: NOD-like receptor signaling pathway", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "KEGG", "id": "KEGG: Epstein-Barr virus infection", "label": "KEGG: Epstein-Barr virus infection", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "KEGG", "id": "KEGG: Hepatitis C", "label": "KEGG: Hepatitis C", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "KEGG", "id": "KEGG: Coronavirus disease - COVID-19", "label": "KEGG: Coronavirus disease - COVID-19", "shape": "dot", "size": 10}, {"font": {"color": "white"}, "group": "KEGG", "id": "KEGG: Cytosolic DNA-sensing pathway", "label": "KEGG: Cytosolic DNA-sensing pathway", "shape": "dot", "size": 10}]);
+                  edges = new vis.DataSet([]);
+
+                  nodeColors = {};
+                  allNodes = nodes.get({ returnType: "Object" });
+                  for (nodeId in allNodes) {
+                    nodeColors[nodeId] = allNodes[nodeId].color;
+                  }
+                  allEdges = edges.get({ returnType: "Object" });
+                  // adding nodes and edges to the graph
+                  data = {nodes: nodes, edges: edges};
+
+                  var options = {
+    "configure": {
+        "enabled": false
+    },
+    "edges": {
+        "color": {
+            "inherit": true
+        },
+        "smooth": {
+            "enabled": true,
+            "type": "dynamic"
+        }
+    },
+    "interaction": {
+        "dragNodes": true,
+        "hideEdgesOnDrag": false,
+        "hideNodesOnDrag": false
+    },
+    "physics": {
+        "enabled": true,
+        "stabilization": {
+            "enabled": true,
+            "fit": true,
+            "iterations": 1000,
+            "onlyDynamicEdges": false,
+            "updateInterval": 50
+        }
+    }
+};
+
+                  
+
+
+                  
+
+                  network = new vis.Network(container, data, options);
+
+                  
+
+                  
+
+                  
+
+
+                  
+                      network.on("stabilizationProgress", function(params) {
+                          document.getElementById('loadingBar').removeAttribute("style");
+                          var maxWidth = 496;
+                          var minWidth = 20;
+                          var widthFactor = params.iterations/params.total;
+                          var width = Math.max(minWidth,maxWidth * widthFactor);
+                          document.getElementById('bar').style.width = width + 'px';
+                          document.getElementById('text').innerHTML = Math.round(widthFactor*100) + '%';
+                      });
+                      network.once("stabilizationIterationsDone", function() {
+                          document.getElementById('text').innerHTML = '100%';
+                          document.getElementById('bar').style.width = '496px';
+                          document.getElementById('loadingBar').style.opacity = 0;
+                          // really clean the dom element
+                          setTimeout(function () {document.getElementById('loadingBar').style.display = 'none';}, 500);
+                      });
+                  
+
+                  return network;
+
+              }
+              drawGraph();
+        </script>
+    </body>
+</html>

@@ -17,6 +17,8 @@ from venn import venn
 from gprofiler import GProfiler
 import seaborn as sns
 from upsetplot import UpSet, from_memberships
+import networkx as nx
+from pyvis.network import Network
 
 class ProteinVisualization:
 
@@ -1002,59 +1004,74 @@ class ProteinVisualization:
 
         return fig
     
-    def plot_intensity_density(self, config, color_discrete_map=None):
+    def plot_intensity_density(self, config=None):
         """
-        Create density plots of protein intensities grouped by sample groups.
-        Assumes that the annotation information includes a 'Group' column
-        and that the intensity data is stored in 'protein_data'.
+        Generates a Protein Intensity Density Distribution Plot.
+
+        Args:
+            config (dict): Configuration dictionary for the plot. Includes colors, dimensions, and style.
+
+        Returns:
+            BytesIO: In-memory PNG image of the density plot.
         """
-        # Ensure protein data and annotation info are loaded
         if self.protein_data is None or self.annotation_info is None:
-            raise ValueError("Protein data or annotation info not loaded.")
-        
-        # Merge protein data with annotation info
-        # Merge protein data with annotation info
-        df = self.protein_data.copy()
-        sample_columns = list(self.annotation_info.SampleName.unique())
-        filtered_df = df[['Protein'] + [col for col in sample_columns if col in df.columns]]
-        filtered_df = pd.melt(filtered_df, id_vars=['Protein'], var_name='Sample', value_name='Intensity')
-        filtered_df['log10(Intensity)'] = np.log10(filtered_df['Intensity'].replace(0, np.nan))
-        filtered_df = filtered_df.merge(self.annotation_info, left_on='Sample', right_on='SampleName', how='left')
+            raise ValueError("Protein data and annotation info must be loaded.")
 
-        # Aggregate intensities by group
-        group_data = filtered_df.groupby('Group')['log10(Intensity)'].apply(list).reset_index()
+        # Default configuration
+        default_config = {
+            "palette": sns.color_palette("husl", 10),
+            "height": 4,
+            "col_wrap": 3,
+            "alpha": 0.8,
+            "linewidth": 1.2,
+        }
+        plot_config = {**default_config, **(config or {})}
 
-        # Use default colors if no color mapping is provided
-        if color_discrete_map is None:
-            unique_groups = group_data['Group'].unique()
-            default_colors = px.colors.qualitative.Plotly[:len(unique_groups)]
-            color_discrete_map = {group: color for group, color in zip(unique_groups, default_colors)}
-
-        # Create the density plot using plotly express
-        fig = px.histogram(
-            filtered_df,
-            x='log10(Intensity)',
-            color='Group',
-            histnorm='density',
-            nbins=100,
-            opacity=0.7,
-            title=config["title"],
-            labels={'log10(Intensity)': config["x_label"], 'Group': 'Group'},
-            height=config["height"],
-            width=config["width"],
-            color_discrete_map=color_discrete_map
-        )
-        
-        # Update layout for better visibility
-        fig.update_layout(
-            title_text=config["title"],
-            legend_title='Group',
-            margin=dict(t=50, l=50, r=50, b=50),
-            xaxis_title=config["x_label"],
-            yaxis_title=config["y_label"]
+        # Melt the protein data to long format
+        melted_data = self.protein_data.melt(
+            id_vars=['ProteinIds'],  # Columns to keep
+            var_name='SampleName',   # Name for the sample column
+            value_name='Intensity'   # Name for the intensity column
         )
 
-        return fig
+        # Drop rows where Intensity is NaN or empty
+        melted_data = melted_data.dropna(subset=['Intensity'])
+
+        # Convert Intensity to numeric, coercing errors
+        melted_data['Intensity'] = pd.to_numeric(melted_data['Intensity'], errors='coerce')
+        melted_data = melted_data.dropna(subset=['Intensity'])
+
+        # Merge with annotation data to add group information
+        merged_data = melted_data.merge(self.annotation_info, on='SampleName')
+
+        # Calculate log10(Intensity) safely
+        merged_data['log10(Intensity)'] = np.log10(merged_data['Intensity'])
+
+        # Ensure SampleName is treated as a categorical variable
+        merged_data['SampleName'] = merged_data['SampleName'].astype('category')
+
+        # Create the FacetGrid for grouped density plots
+        g = sns.FacetGrid(
+            merged_data, col="Group", col_wrap=plot_config["col_wrap"], 
+            sharex=True, sharey=True, height=plot_config["height"], palette=plot_config["palette"]
+        )
+        g.map_dataframe(sns.kdeplot, x="log10(Intensity)", hue="SampleName", 
+                        alpha=plot_config["alpha"], linewidth=plot_config["linewidth"])
+
+        # Add axis labels and plot title
+        g.set_axis_labels("log10(Intensity)", "Density")
+        g.set_titles("{col_name}")
+        g.add_legend(title="Samples", bbox_to_anchor=(1, 0.5))
+
+        # Save the plot as an in-memory PNG
+        buf = BytesIO()
+        plt.subplots_adjust(top=0.9)
+        g.fig.suptitle("Protein Intensity Density Distribution")
+        plt.savefig(buf, format="png", bbox_inches="tight")
+        buf.seek(0)
+        plt.close(g.fig)  # Close the figure to free memory
+
+        return buf
         
         
     
@@ -1581,4 +1598,37 @@ class ProteinVisualization:
         plt.close(fig)  # Close the figure to free memory
 
         return buf
+    
+    def generate_network_graph(self, dep_list, go_terms, kegg_terms):
+        """
+        Create a network graph connecting filtered proteins, GO terms, and KEGG pathways.
+        """
+        # Initialize graph
+        G = nx.Graph()
 
+        # Add filtered protein nodes
+        for protein in dep_list["Protein"]:
+            G.add_node(protein, category="Protein", color="blue")
+
+        # Add filtered GO term nodes and edges
+        for go_category, go_df in go_terms.items():
+            if not go_df.empty:
+                for _, row in go_df.iterrows():
+                    G.add_node(row["native"], category=go_category, color="green")
+                    for protein in row["intersections"]:
+                        if protein in dep_list["Protein"].tolist():
+                            G.add_edge(protein, row["native"])
+
+        # Add filtered KEGG nodes and edges
+        for _, row in kegg_terms.iterrows():
+            G.add_node(row["native"], category="KEGG", color="red")
+            for protein in row["intersections"]:
+                if protein in dep_list["Protein"].tolist():
+                    G.add_edge(protein, row["native"])
+
+        # Create PyVis network
+        net = Network(height="600px", width="100%", bgcolor="#222222", font_color="white")
+        net.from_nx(G)
+        net.show_buttons(filter_=["physics"])
+
+        return net.generate_html()

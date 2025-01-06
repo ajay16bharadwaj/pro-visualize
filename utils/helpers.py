@@ -42,3 +42,28 @@ def get_user_volcano_config():
         user_config["threshold_lines"] = st.checkbox("Show Threshold Lines", user_config["threshold_lines"])
 
     return user_config
+
+def render_go_plot(vis, cc_df, cc_selected_terms):
+    """Helper function to render the GO:CC plot."""
+    if cc_selected_terms.empty:
+        # Default plot with top 10 terms
+        fig_cc, ax_cc = vis.plot_go_dotplot(
+            cc_df.sort_values(by="q_value").head(10),
+            category_name="Cellular Component"
+        )
+        fig_cc.set_size_inches(5, 3)
+        st.pyplot(fig_cc)
+    else:
+        # Filter `cc_df` to include only the selected terms
+        selected_native_ids = cc_selected_terms["native"].tolist()
+        filtered_cc_df = cc_df[cc_df["native"].isin(selected_native_ids)]
+
+        # Plot using the filtered DataFrame
+        if not filtered_cc_df.empty:
+            filtered_fig_cc, filtered_ax_cc = vis.plot_go_dotplot(
+                filtered_cc_df, category_name="Cellular Component"
+            )
+            filtered_fig_cc.set_size_inches(5, 3)
+            st.pyplot(filtered_fig_cc)
+        else:
+            st.warning("No data available for the selected terms.")

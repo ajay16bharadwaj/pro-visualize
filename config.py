@@ -1,4 +1,5 @@
 # config.py
+import seaborn as sns
 
 # Default column names for analysis
 DEFAULT_COL_DEPLABEL = 'Label2'       # Label column
@@ -87,13 +88,12 @@ DEFAULT_GLOBAL_CONFIG = {
     "default_gene_name_column": DEFAULT_GENE_NAME_COLUMN,
 }
 
-DEFAULT_PROTEIN_INTENSITY_DENSITY_CONFIG = {
-    "title": "Density Plot",
-    "x_label": "log10 Intensity",
-    "y_label": "Density Estimate",
-    "nbins": 50,
-    "height": 800,
-    "width": 1200,
+DEFAULT_DENSITY_CONFIG = {
+    "palette": sns.color_palette("husl", 10),  # Default color palette
+    "height": 4,                               # Height of each plot
+    "col_wrap": 3,                             # Number of columns in FacetGrid
+    "alpha": 0.8,                              # Transparency of density lines
+    "linewidth": 1.2                           # Line thickness of density plots
 }
 
 DEFAULT_PCA_BY_ANNOTATION_CONFIG = {

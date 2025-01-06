@@ -1,7 +1,8 @@
 from utils.decorators import validate_inputs, safe_tab_execution
-from config import DEFAULT_COL_DEPLABEL, DEFAULT_FDR_THRESHOLD, DEFAULT_LOG2FC_THRESHOLD, DEFAULT_PROTEIN_PER_SAMPLE_CONFIG, DEFAULT_PROTEIN_INTENSITY_DENSITY_CONFIG
+from config import DEFAULT_COL_DEPLABEL, DEFAULT_FDR_THRESHOLD, DEFAULT_LOG2FC_THRESHOLD, DEFAULT_PROTEIN_PER_SAMPLE_CONFIG, DEFAULT_DENSITY_CONFIG
 import streamlit as st
 import pandas as pd
+import seaborn as sns
 from utils.helpers import dataframe_with_selections
 
 #quantification plots - Tab Code. Need documentation for what the plot is? 
@@ -71,71 +72,45 @@ def render_quantification_plots(vis, figures_dict, protein_status, annotation_st
         figures_dict["protein_overlap"] = plot_protein_overlap
 
     with quant_tab3:
-        if "intensity_density_config" not in st.session_state:
-            st.session_state.intensity_density_config = DEFAULT_PROTEIN_INTENSITY_DENSITY_CONFIG.copy()
+        st.subheader("Protein Intensity Density Distribution")
 
-        # Create a temporary structure to hold user inputs
-        user_inputs = st.session_state.intensity_density_config.copy()
+        with st.expander("Customize Density Plot"):
+            # Configuration options
+            height = st.slider("Plot Height", 2, 10, DEFAULT_DENSITY_CONFIG["height"], key="density_height")
+            col_wrap = st.slider("Columns per Row", 1, 5, DEFAULT_DENSITY_CONFIG["col_wrap"], key="density_col_wrap")
+            alpha = st.slider("Line Transparency", 0.0, 1.0, DEFAULT_DENSITY_CONFIG["alpha"], 0.1, key="density_alpha")
+            linewidth = st.slider("Line Width", 0.5, 3.0, DEFAULT_DENSITY_CONFIG["linewidth"], 0.1, key="density_linewidth")
 
-        # User inputs for customizing the plot
-        with st.expander("Modify Density Plot"):
-            user_inputs["title"] = st.text_input(
-                "Plot Title", 
-                user_inputs["title"], 
-                key="density_plot_title"
+            # Color palette picker
+            palette_option = st.selectbox(
+                "Color Palette",
+                ["husl", "deep", "muted", "bright", "dark", "colorblind"],
+                index=0,
+                key="density_palette"
             )
-            user_inputs["x_label"] = st.text_input(
-                "X-axis Label", 
-                user_inputs["x_label"], 
-                key="density_x_label"
-            )
-            user_inputs["y_label"] = st.text_input(
-                "Y-axis Label", 
-                user_inputs["y_label"], 
-                key="density_y_label"
-            )
-            user_inputs["nbins"] = st.slider(
-                "Number of Bins", 
-                10, 200, 
-                user_inputs["nbins"], 
-                key="density_nbins"
-            )
-            user_inputs["height"] = st.slider(
-                "Plot Height", 
-                400, 1200, 
-                user_inputs["height"], 
-                key="density_height"
-            )
-            user_inputs["width"] = st.slider(
-                "Plot Width", 
-                400, 1200, 
-                user_inputs["width"], 
-                key="density_width"
-            )
+            palette = sns.color_palette(palette_option, len(vis.annotation_info["Group"].unique()))
 
-        # Apply and Reset buttons
-        apply_col, reset_col = st.columns([1, 1])
-        with apply_col:
-            if st.button("Apply Changes", key="density_apply_changes"):
-                # Save the user inputs into session state
-                st.session_state.intensity_density_config = user_inputs.copy()
-                st.toast("Density plot configuration updated!", icon="✅")
-        with reset_col:
-            if st.button("Reset to Default", key="density_reset_default"):
-                # Reset to the default configuration
-                st.session_state.intensity_density_config = DEFAULT_PROTEIN_INTENSITY_DENSITY_CONFIG.copy()
-                st.toast("Density plot configuration reset to defaults!", icon="🔄")
+            # Apply and Reset buttons
+            apply_col, reset_col = st.columns(2)
+            if apply_col.button("Apply Changes", key="density_apply_changes"):
+                density_config = {
+                    "palette": palette,
+                    "height": height,
+                    "col_wrap": col_wrap,
+                    "alpha": alpha,
+                    "linewidth": linewidth,
+                }
+                st.session_state.density_config = density_config
+                st.toast("Density plot customization applied!", icon="✅")
 
-        # Generate the plot using the updated configuration
-        intensity_density_fig = vis.plot_intensity_density(
-            config=st.session_state.intensity_density_config,
-            color_discrete_map=global_config["group_colors"]
-        )
-        st.plotly_chart(intensity_density_fig)
-        figures_dict["intensity_density"] = intensity_density_fig
-        # plot_intensity_density = vis.plot_intensity_density()
-        # st.plotly_chart(plot_intensity_density)
-        # figures_dict["intensity_density"] = plot_intensity_density
+            if reset_col.button("Reset to Defaults", key="density_reset_defaults"):
+                st.session_state.density_config = DEFAULT_DENSITY_CONFIG.copy()
+                st.toast("Density plot reset to default settings!", icon="🔄")
+
+        # Generate and display the plot
+        with st.spinner("Generating density plot..."):
+            density_plot = vis.plot_intensity_density(config=st.session_state.get("density_config", DEFAULT_DENSITY_CONFIG))
+            st.image(density_plot, caption="Protein Intensity Density Distribution", use_column_width=True)
 
     with quant_tab4:
         plot_correlation_matrix = vis.plot_correlation_matrix()
