@@ -5,7 +5,7 @@ import pandas as pd
 from utils.helpers import dataframe_with_selections
 
 #clustering plots - Tab Code. Need documentation for what the plot is? 
-#@safe_tab_execution("Clustering")
+safe_tab_execution("Clustering")
 @validate_inputs(protein_status=True, annotation_status=True)
 def render_clustering(vis, figures_dict, protein_status, annotation_status, global_config, **kwargs):
     """Render clustering plots Tab and update figures_dict."""

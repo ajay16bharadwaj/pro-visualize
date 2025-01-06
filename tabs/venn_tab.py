@@ -43,7 +43,7 @@ def render_venn_tab(vis, figures_dict, protein_status, annotation_status, **kwar
         img_bytes.seek(0)
 
         # Use st.image to display the image with a specified width.
-        st.image(img_bytes, caption='Venn Diagram', use_column_width=False, width=600)
+        st.image(img_bytes, caption='Venn Diagram', use_container_width=False, width=600)
 
     with venn_tab2: 
         st.subheader("Sankey Diagram")
@@ -152,5 +152,5 @@ def render_venn_tab(vis, figures_dict, protein_status, annotation_status, **kwar
         # Generate and display the UpSet Plot
         with st.spinner("Generating UpSet plot..."):
             upset_image = vis.plot_upset(selected_groups=selected_groups)
-            st.image(upset_image, caption="UpSet Plot of Protein Intersections", use_column_width=True)
+            st.image(upset_image, caption="UpSet Plot of Protein Intersections", use_container_width=True)
     
